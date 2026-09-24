@@ -1,0 +1,40 @@
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+@import "./styles/theme.css";
+
+@theme {
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-card: hsl(var(--card));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-border: hsl(var(--border));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-unread-dot: hsl(var(--unread-dot));
+  --color-verified-icon: hsl(var(--verified-icon));
+  --font-sans: "Inter Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+body {
+  @apply bg-background text-foreground font-sans;
+  /* Outrun skyline glow: a faint magenta horizon above, cyan haze below. */
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% -10%, hsl(323 100% 55% / 0.12), transparent 70%),
+    radial-gradient(ellipse 60% 40% at 80% 110%, hsl(190 100% 50% / 0.07), transparent 70%);
+  background-attachment: fixed;
+}
+
+/* TipTap wraps each list item's text in its own <p> (`<li><p>text</p></li>`)
+   Combined with the Typography plugin's paragraph margins, that stacks a
+   paragraph gap on top of the list-item gap, making bullet lists look
+   double-spaced. Zero out the inner <p> margin and give <li> itself a
+   tighter, single margin instead. */
+.prose :where(li > p) {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+.prose :where(li) {
+  margin-top: 0.2em;
+  margin-bottom: 0.2em;
+}

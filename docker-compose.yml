@@ -1,0 +1,13 @@
+services:
+  yo:
+    build: .
+    restart: unless-stopped
+    env_file:
+      - .env
+    # Bound to localhost only: no port forwarding, no LAN/public exposure.
+    # `tailscale serve` on the host terminates HTTPS and proxies to this port
+    # (see deploy/self-host.md), which is the only intended way in.
+    ports:
+      - "127.0.0.1:3001:3001"
+    volumes:
+      - ./server/data:/app/server/data

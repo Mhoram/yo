@@ -1,0 +1,25 @@
+:root {
+  /* Outrun / synthwave: deep violet night sky, hot magenta primary,
+     neon cyan accents. */
+  --background: 252 40% 9%; /* #131019, near-black violet */
+  --foreground: 320 100% 96%; /* pink-tinted white */
+  --card: 252 30% 13%; /* #1C1726 */
+  --muted: 255 28% 18%; /* #2A2338 */
+  --muted-foreground: 255 15% 62%; /* lavender gray */
+  --border: 285 40% 25%; /* #4A2D69, purple glow edge */
+
+  --primary: 323 100% 58%; /* #FF2E8C, hot magenta */
+  --primary-foreground: 0 0% 100%;
+
+  --unread-dot: 190 100% 50%; /* #00CFF0, neon cyan */
+  --verified-icon: 174 90% 50%; /* #0BE8CF, aqua */
+
+  --avatar-1: 45 100% 60%; /* amber */
+  --avatar-2: 190 100% 55%; /* cyan */
+  --avatar-3: 323 100% 62%; /* pink */
+  --avatar-4: 265 100% 66%; /* violet */
+  --avatar-5: 100 90% 55%; /* lime */
+  --avatar-6: 20 100% 60%; /* orange */
+  --avatar-7: 215 100% 65%; /* blue */
+  --avatar-8: 300 100% 60%; /* fuchsia */
+}
