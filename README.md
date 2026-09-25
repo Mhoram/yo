@@ -2,6 +2,10 @@
 
 A personal email client that sits on top of your existing Gmail account. New senders go to the Gatekeeper and wait there until you approve or block them. Mail from approved senders gets sorted into Yobox, Receipts, or Feed instead of piling up in one flat inbox. It talks to Gmail through the Gmail API, so your mail stays in Gmail the whole time.
 
+## License
+
+[AGPL-3.0](./LICENSE). Free to self-host, forever. If you modify it and offer it as a hosted service, the license requires you to release your modified source. The copyright holder may additionally license it under commercial terms on request.
+
 ## Status
 
 What works today:
