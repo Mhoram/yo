@@ -86,7 +86,7 @@ export function ThreadList({
             + Write
           </Link>
         </div>
-        <span className="mt-4 block h-px w-full rounded-full bg-gradient-to-r from-[#00d4ff] to-[#b026ff]" />
+        <span className="mt-4 block h-px w-full rounded-full bg-gradient-to-r from-[#39ff14] to-[#00d4ff]" />
         {newForYou.length > 0 && (
           <SectionHeading
             withRule
