@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { plainTextSnippet } from '../lib/plainTextSnippet.js';
 import type { MailProvider } from '../mail-provider/MailProvider.js';
 import {
   approveSender,
@@ -18,7 +19,7 @@ export function gatekeeperRouter(mailProvider: MailProvider): Router {
       senders: pending.map((s) => ({
         email: s.sender_email,
         displayName: s.display_name,
-        snippet: s.first_snippet,
+        snippet: plainTextSnippet(s.first_snippet ?? ''),
         heldCount: s.held_count,
         firstSeenAt: s.first_seen_at,
         threadId: s.first_thread_id,
@@ -32,7 +33,7 @@ export function gatekeeperRouter(mailProvider: MailProvider): Router {
       senders: blocked.map((s) => ({
         email: s.sender_email,
         displayName: s.display_name,
-        snippet: s.first_snippet,
+        snippet: plainTextSnippet(s.first_snippet ?? ''),
         heldCount: s.held_count,
         decidedAt: s.decided_at,
         threadId: s.first_thread_id,
