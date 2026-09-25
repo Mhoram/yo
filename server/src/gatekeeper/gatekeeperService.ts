@@ -1,4 +1,5 @@
 import type { MailProvider } from '../mail-provider/MailProvider.js';
+import { plainTextSnippet } from '../lib/plainTextSnippet.js';
 import { ensureLabel } from '../mail-provider/labelRegistry.js';
 import { mapWithConcurrency } from '../lib/concurrency.js';
 import {
@@ -50,7 +51,7 @@ export async function gateThreadBySender(
       senderEmail: email,
       senderDomain: domain,
       displayName: sender.name ?? null,
-      firstSnippet: thread.snippet,
+      firstSnippet: plainTextSnippet(thread.snippet),
       firstThreadId: thread.id,
     });
     approval = getSenderApproval(email);

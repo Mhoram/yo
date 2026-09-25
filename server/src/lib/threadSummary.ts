@@ -1,4 +1,5 @@
 import type { MailThread } from '../mail-provider/types.js';
+import { plainTextSnippet } from './plainTextSnippet.js';
 
 export interface ThreadSummaryDto {
   id: string;
@@ -19,7 +20,7 @@ export function buildThreadSummary(thread: MailThread): ThreadSummaryDto {
     // Gmail's thread-level `snippet` comes back empty for `format=metadata`
     // requests (used everywhere list views fetch threads); each message's
     // own `snippet` is populated regardless of format, so prefer that.
-    snippet: last?.snippet || thread.snippet,
+    snippet: plainTextSnippet(last?.snippet || thread.snippet),
     labelIds: thread.labelIds,
     from: last?.from,
     to: last?.to,
