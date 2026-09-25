@@ -38,9 +38,9 @@ export function BoxMenuButton() {
         onClick={() => setOpen((o) => !o)}
         aria-label="Switch inbox"
         aria-expanded={open}
-        className="fixed bottom-2.5 left-1/2 z-30 flex h-14 w-14 -translate-x-1/2 items-center justify-center rounded-full bg-card shadow-lg ring-1 ring-border sm:static sm:h-9 sm:w-9 sm:translate-x-0 sm:bg-transparent sm:shadow-none sm:ring-0 sm:hover:bg-muted"
+        className="fixed bottom-2.5 left-1/2 z-30 flex h-14 w-14 -translate-x-1/2 items-center justify-center rounded-full bg-card shadow-lg ring-1 ring-border sm:static sm:h-[58px] sm:w-[58px] sm:translate-x-0 sm:bg-transparent sm:shadow-none sm:ring-0 sm:hover:bg-muted"
       >
-        <img src="/favicon.svg" alt="yo" className="h-12 w-12 sm:h-6 sm:w-6" />
+        <img src="/favicon.svg?v=3" alt="yo" className="h-9 w-9 sm:h-[30px] sm:w-[30px]" />
       </button>
 
       {open && (
