@@ -1,15 +1,15 @@
 :root {
-  /* Outrun / synthwave: deep violet night sky, hot magenta primary,
-     neon cyan accents. */
-  --background: 252 40% 9%; /* #131019, near-black violet */
-  --foreground: 320 100% 96%; /* pink-tinted white */
-  --card: 252 30% 13%; /* #1C1726 */
-  --muted: 255 28% 18%; /* #2A2338 */
-  --muted-foreground: 255 15% 62%; /* lavender gray */
-  --border: 285 40% 25%; /* #4A2D69, purple glow edge */
+  /* Neon green on deep green-black: terminal-bright primary, violet-free
+     dark surfaces, cyan as the secondary accent. */
+  --background: 150 25% 6%; /* #0B120D — near-black green */
+  --foreground: 120 30% 96%; /* green-tinted white */
+  --card: 150 22% 10%; /* #121C15 */
+  --muted: 150 18% 15%; /* #1D2B21 */
+  --muted-foreground: 140 12% 62%; /* sage gray */
+  --border: 140 40% 22%; /* #214D33 — green glow edge */
 
-  --primary: 323 100% 58%; /* #FF2E8C, hot magenta */
-  --primary-foreground: 0 0% 100%;
+  --primary: 113 100% 54%; /* #39FF14, neon green */
+  --primary-foreground: 150 25% 6%; /* dark text on the bright green */
 
   --unread-dot: 190 100% 50%; /* #00CFF0, neon cyan */
   --verified-icon: 174 90% 50%; /* #0BE8CF, aqua */

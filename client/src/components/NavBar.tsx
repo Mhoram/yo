@@ -149,7 +149,7 @@ export function NavBar() {
       {pendingCount > 0 && location.pathname !== '/gatekeeper' && (
         <Link
           to="/gatekeeper"
-          className="mt-3 block w-full rounded-lg bg-gradient-to-r from-[#00d4ff] to-[#b026ff] px-4 py-3 text-center text-sm font-bold text-white shadow-lg transition-transform hover:scale-[1.01] hover:brightness-110 sm:w-1/4 sm:text-left"
+          className="mt-3 block w-full rounded-lg bg-gradient-to-r from-[#39ff14] to-[#00d4ff] px-4 py-3 text-center text-sm font-bold text-[#0b120d] shadow-lg transition-transform hover:scale-[1.01] hover:brightness-110 sm:w-1/4 sm:text-left"
         >
           Screen {pendingCount} first time {pendingCount === 1 ? 'sender' : 'senders'} →
         </Link>
