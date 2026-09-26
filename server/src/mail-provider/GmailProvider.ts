@@ -203,12 +203,15 @@ export class GmailProvider implements MailProvider {
   // Metadata-only pages over recent mail (5 quota units per page of 100,
   // not the 50+/thread a full fetch would cost) harvesting address headers.
   // Sent mail is swept first (its addresses rank higher as things you chose
-  // to write to), then the inbox for people who have written to you. An
-  // address seen in both keeps the 'sent' source.
+  // to write to), then all mail for people who have written to you. An
+  // address seen in both keeps the 'sent' source. All-mail rather than
+  // INBOX-only because yo's gatekeeper strips INBOX from approved mail into
+  // its own bucket labels — an INBOX sweep would mostly miss regular
+  // correspondents on an actively-used install.
   async listRecentAddresses(maxResults: number): Promise<HarvestedAddress[]> {
     const seen = new Map<string, HarvestedAddress>();
 
-    const harvest = async (labelIds: string[], wanted: Set<string>, source: HarvestedAddress['source']) => {
+    const harvest = async (labelIds: string[] | undefined, wanted: Set<string>, source: HarvestedAddress['source']) => {
       let pageToken: string | undefined;
       while (seen.size < maxResults) {
         recordCall('messages.list');
@@ -235,7 +238,7 @@ export class GmailProvider implements MailProvider {
     };
 
     await harvest(['SENT'], new Set(['to', 'cc']), 'sent');
-    await harvest(['INBOX'], new Set(['from', 'to', 'cc']), 'received');
+    await harvest(undefined, new Set(['from', 'to', 'cc']), 'received');
 
     return Array.from(seen.values());
   }
