@@ -13,6 +13,7 @@ import type {
 import { parseAddressList, parseGmailMessage } from './mimeParser.js';
 import { loadTokens, saveTokens } from '../db/oauthTokenStore.js';
 import { recordCall } from '../lib/quotaTracker.js';
+import { mapWithConcurrency } from '../lib/concurrency.js';
 
 const SCOPES = [
   'https://www.googleapis.com/auth/gmail.modify',
@@ -200,18 +201,20 @@ export class GmailProvider implements MailProvider {
     };
   }
 
-  // Metadata-only pages over mail (5 quota units per page of 100, not the
-  // 50+/thread a full fetch would cost) harvesting address headers. Sent
+  // Harvests address headers (From/To/Cc) for the compose autocomplete.
+  // messages.list does NOT return headers (only ids/labels), so this lists
+  // ids cheaply then fetches each message metadata-only — 20 quota units
+  // each, so the sweep paces itself well under Google's 250 units/min/user
+  // limit and must run in the background, never blocking a request. Sent
   // mail is swept first (its addresses rank higher as things you chose to
-  // write to), then all mail for people who have written to you. An address
+  // write to), then all mail for people who have written to you; an address
   // seen in both keeps the 'sent' source. All-mail rather than INBOX-only
   // because yo's gatekeeper strips INBOX from approved mail into its own
   // bucket labels — an INBOX sweep would mostly miss regular correspondents
   // on an actively-used install.
   //
-  // Bounded by maxMessages (quota discipline: a call never runs away), and
-  // resumable: the route feeds back nextPageToken on later runs until the
-  // whole mailbox has been swept.
+  // Bounded by maxMessages and resumable: the route feeds back nextPageToken
+  // on later runs until the whole mailbox has been swept.
   async listRecentAddresses(
     opts?: { maxMessages?: number; pageToken?: string },
   ): Promise<{ addresses: HarvestedAddress[]; nextPageToken?: string }> {
@@ -219,13 +222,27 @@ export class GmailProvider implements MailProvider {
     const seen = new Map<string, HarvestedAddress>();
     let scanned = 0;
 
+    // Rolling-window pace limiter: at most GETS_PER_MIN messages.get calls
+    // per 60s (~200 quota units), leaving headroom for interactive calls
+    // sharing the same per-user quota window.
+    const GETS_PER_MIN = 10;
+    const getTimes: number[] = [];
+    const pace = async () => {
+      const now = Date.now();
+      while (getTimes.length > 0 && now - getTimes[0] > 60_000) getTimes.shift();
+      if (getTimes.length >= GETS_PER_MIN) {
+        const waitMs = 60_000 - (now - getTimes[0]) + 100;
+        await new Promise((r) => setTimeout(r, waitMs));
+      }
+      getTimes.push(Date.now());
+    };
+
     const sweep = async (
       labelIds: string[] | undefined,
-      wanted: Set<string>,
-      defaultSource: HarvestedAddress['source'],
+      keepSpamTrash: boolean,
       startToken: string | undefined,
       pageCap: number,
-    ): Promise<{ token?: string; scanned: number }> => {
+    ): Promise<string | undefined> => {
       let pageToken = startToken;
       let pages = 0;
       while (pages < pageCap && scanned < maxMessages) {
@@ -234,19 +251,30 @@ export class GmailProvider implements MailProvider {
           userId: 'me',
           labelIds,
           // Keep spam/trash out of the address book.
-          q: labelIds ? undefined : '-in:spam -in:trash',
+          q: keepSpamTrash ? undefined : '-in:spam -in:trash',
           maxResults: Math.min(100, maxMessages - scanned),
           pageToken,
         });
+        const msgs = res.data.messages ?? [];
+        pages += 1;
+        pageToken = res.data.nextPageToken ?? undefined;
+        if (msgs.length === 0) break;
 
-        for (const m of res.data.messages ?? []) {
+        for (const m of msgs) {
+          if (scanned >= maxMessages) break;
+          await pace();
+          recordCall('messages.get');
+          const full = await this.gmail.users.messages.get({
+            userId: 'me',
+            id: m.id!,
+            format: 'metadata',
+            metadataHeaders: ['From', 'To', 'Cc'],
+          });
           scanned += 1;
-          // list responses include labelIds; when present, use them to
-          // detect sent mail even in the all-mail sweep.
-          const source: HarvestedAddress['source'] =
-            m.labelIds?.includes('SENT') ? 'sent' : defaultSource;
-          for (const h of m.payload?.headers ?? []) {
-            if (!wanted.has(h.name?.toLowerCase() ?? '')) continue;
+          const source: HarvestedAddress['source'] = full.data.labelIds?.includes('SENT') ? 'sent' : 'received';
+          for (const h of full.data.payload?.headers ?? []) {
+            const name = h.name?.toLowerCase();
+            if (name !== 'from' && name !== 'to' && name !== 'cc') continue;
             for (const addr of parseAddressList(h.value ?? '')) {
               const key = addr.email.toLowerCase();
               if (!seen.has(key)) seen.set(key, { address: addr, source });
@@ -254,23 +282,21 @@ export class GmailProvider implements MailProvider {
           }
         }
 
-        pages += 1;
-        pageToken = res.data.nextPageToken ?? undefined;
         if (!pageToken) break;
       }
-      return { token: pageToken, scanned };
+      return pageToken;
     };
 
     // Resuming a prior run: the sent sweep already happened, continue the
     // all-mail sweep from the stored cursor.
     if (opts?.pageToken) {
-      const deep = await sweep(undefined, new Set(['from', 'to', 'cc']), 'received', opts.pageToken, Math.ceil(maxMessages / 100));
-      return { addresses: Array.from(seen.values()), nextPageToken: deep.token };
+      const token = await sweep(undefined, false, opts.pageToken, Math.ceil(maxMessages / 100));
+      return { addresses: Array.from(seen.values()), nextPageToken: token };
     }
 
-    const sent = await sweep(['SENT'], new Set(['to', 'cc']), 'sent', undefined, 10);
-    const deep = await sweep(undefined, new Set(['from', 'to', 'cc']), 'received', undefined, Math.ceil(maxMessages / 100));
-    return { addresses: Array.from(seen.values()), nextPageToken: deep.token };
+    await sweep(['SENT'], true, undefined, 10);
+    const token = await sweep(undefined, false, undefined, Math.ceil(maxMessages / 100));
+    return { addresses: Array.from(seen.values()), nextPageToken: token };
   }
 
   async getHistorySince(historyId: string): Promise<{ changes: HistoryChange[]; newHistoryId: string }> {
