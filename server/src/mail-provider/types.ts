@@ -60,6 +60,7 @@ export interface OutgoingAttachment {
 export interface OutgoingMessage {
   to: string[];
   cc?: string[];
+  bcc?: string[];
   subject: string;
   bodyText: string;
   bodyHtml?: string;

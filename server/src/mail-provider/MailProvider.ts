@@ -1,5 +1,6 @@
 import type {
   HistoryChange,
+  MailAddress,
   MailLabel,
   MailThread,
   MailMessage,
@@ -20,10 +21,16 @@ export interface MailProvider {
   // full=true (default) fetches bodies/attachments too (for reading a thread).
   getThread(threadId: string, opts?: { full?: boolean }): Promise<MailThread>;
   getMessage(messageId: string): Promise<MailMessage>;
+
   getAttachment(
     messageId: string,
     attachmentId: string,
   ): Promise<{ data: Buffer; mimeType: string; filename: string }>;
+
+  // Distinct To/Cc addresses from the most recent sent mail, newest first.
+  // Powers the compose recipient autocomplete; the contacts cache is seeded
+  // from this once (cheap: metadata-only list calls), not per keystroke.
+  listSentRecipients(maxResults: number): Promise<MailAddress[]>;
 
   getHistorySince(historyId: string): Promise<{ changes: HistoryChange[]; newHistoryId: string }>;
   getCurrentHistoryId(): Promise<string>;

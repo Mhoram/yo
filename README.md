@@ -15,6 +15,7 @@ What works today:
 - Picking a bucket (Yobox, Receipts, or Feed) when you approve a sender
 - Receipts and Feed views with infinite scroll
 - Compose, reply, forward, attachments
+- Recipient autocomplete in To/Cc/Bcc, built from your own sent mail and approved senders (local cache, no quota cost while typing)
 - Search
 - Sent view, built on Gmail's `SENT` label but shown from the recipient's point of view
 - "Move to..." to change an approved sender's bucket from a thread view

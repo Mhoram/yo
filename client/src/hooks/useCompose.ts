@@ -6,6 +6,7 @@ export function useComposeMessage() {
     mutationFn: (opts: {
       to: string[];
       cc?: string[];
+      bcc?: string[];
       subject: string;
       bodyText: string;
       bodyHtml?: string;

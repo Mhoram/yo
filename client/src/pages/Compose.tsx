@@ -3,13 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import { NavBar } from '../components/NavBar';
 import { RichTextEditor } from '../components/RichTextEditor';
 import { AttachmentPicker, attachmentsToPayload, type PendingAttachment } from '../components/AttachmentPicker';
+import { RecipientField } from '../components/RecipientField';
 import { useComposeMessage } from '../hooks/useCompose';
 
 function parseEmailList(raw: string): string[] {
   return raw
     .split(',')
     .map((s) => s.trim())
-    .filter(Boolean);
+    .filter((s) => s.includes('@'));
 }
 
 const fieldClass =
@@ -18,6 +19,7 @@ const fieldClass =
 export function Compose() {
   const [to, setTo] = useState('');
   const [cc, setCc] = useState('');
+  const [bcc, setBcc] = useState('');
   const [subject, setSubject] = useState('');
   const [bodyHtml, setBodyHtml] = useState('');
   const [bodyText, setBodyText] = useState('');
@@ -27,13 +29,19 @@ export function Compose() {
 
   const toList = parseEmailList(to);
   const ccList = parseEmailList(cc);
+  const bccList = parseEmailList(bcc);
   const canSend = toList.length > 0 && subject.trim().length > 0 && bodyText.trim().length > 0;
+
+  // Hide anything already entered in any recipient field from every
+  // field's suggestions.
+  const allRecipients = [...toList, ...ccList, ...bccList];
 
   function send() {
     compose.mutate(
       {
         to: toList,
         cc: ccList.length > 0 ? ccList : undefined,
+        bcc: bccList.length > 0 ? bccList : undefined,
         subject,
         bodyText,
         bodyHtml,
@@ -49,13 +57,9 @@ export function Compose() {
       <h1 className="mb-8 mt-6 text-center text-4xl font-bold">Write</h1>
 
       <div className="space-y-3 rounded-lg border border-border bg-card p-4">
-        <input
-          value={to}
-          onChange={(e) => setTo(e.target.value)}
-          placeholder="To (comma-separated email addresses)"
-          className={fieldClass}
-        />
-        <input value={cc} onChange={(e) => setCc(e.target.value)} placeholder="Cc (optional)" className={fieldClass} />
+        <RecipientField value={to} onChange={setTo} placeholder="To" exclude={allRecipients} />
+        <RecipientField value={cc} onChange={setCc} placeholder="Cc (optional)" exclude={allRecipients} />
+        <RecipientField value={bcc} onChange={setBcc} placeholder="Bcc (optional)" exclude={allRecipients} />
         <input
           value={subject}
           onChange={(e) => setSubject(e.target.value)}

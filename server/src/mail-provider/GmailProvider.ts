@@ -2,8 +2,8 @@ import { google, gmail_v1 } from 'googleapis';
 import { OAuth2Client } from 'google-auth-library';
 import MailComposer from 'nodemailer/lib/mail-composer';
 import type { MailProvider } from './MailProvider.js';
-import type { HistoryChange, MailLabel, MailMessage, MailThread, OutgoingMessage } from './types.js';
-import { parseGmailMessage } from './mimeParser.js';
+import type { HistoryChange, MailAddress, MailLabel, MailMessage, MailThread, OutgoingMessage } from './types.js';
+import { parseAddressList, parseGmailMessage } from './mimeParser.js';
 import { loadTokens, saveTokens } from '../db/oauthTokenStore.js';
 import { recordCall } from '../lib/quotaTracker.js';
 
@@ -193,6 +193,39 @@ export class GmailProvider implements MailProvider {
     };
   }
 
+  // Metadata-only pages over recent SENT mail (5 quota units/page of 100,
+  // not the 50+/thread a full fetch would cost) harvesting To/Cc headers.
+  async listSentRecipients(maxResults: number): Promise<MailAddress[]> {
+    const seen = new Map<string, MailAddress>();
+    let pageToken: string | undefined;
+
+    while (seen.size < maxResults) {
+      recordCall('messages.list');
+      const res = await this.gmail.users.messages.list({
+        userId: 'me',
+        labelIds: ['SENT'],
+        maxResults: Math.min(100, maxResults - seen.size),
+        pageToken,
+      });
+
+      for (const m of res.data.messages ?? []) {
+        const headers = m.payload?.headers ?? [];
+        for (const h of headers) {
+          if (h.name?.toLowerCase() !== 'to' && h.name?.toLowerCase() !== 'cc') continue;
+          for (const addr of parseAddressList(h.value ?? '')) {
+            const key = addr.email.toLowerCase();
+            if (!seen.has(key)) seen.set(key, addr);
+          }
+        }
+      }
+
+      pageToken = res.data.nextPageToken ?? undefined;
+      if (!pageToken) break;
+    }
+
+    return Array.from(seen.values());
+  }
+
   async getHistorySince(historyId: string): Promise<{ changes: HistoryChange[]; newHistoryId: string }> {
     recordCall('history.list');
     const res = await this.gmail.users.history.list({
@@ -249,6 +282,7 @@ export class GmailProvider implements MailProvider {
     const composer = new MailComposer({
       to: msg.to.join(', '),
       cc: msg.cc && msg.cc.length > 0 ? msg.cc.join(', ') : undefined,
+      bcc: msg.bcc && msg.bcc.length > 0 ? msg.bcc.join(', ') : undefined,
       subject: msg.subject,
       text: msg.bodyText,
       html: msg.bodyHtml,
