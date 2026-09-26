@@ -4,6 +4,7 @@ build/
 .env
 deploy/backup.env
 PLAN.md
+TODO.md
 server/data/*.db
 server/data/*.db-*
 *.log
