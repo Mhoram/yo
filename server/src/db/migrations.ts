@@ -6,7 +6,6 @@ export const migrations: string[] = [
   // Rename bucket values to the app's own names (was HEY-derived vocabulary).
   `UPDATE sender_approvals SET bucket = 'yobox' WHERE bucket = 'imbox'`,
   `UPDATE sender_approvals SET bucket = 'receipts' WHERE bucket = 'paper_trail'`,
-  // Contacts deep-sweep cursor (existing installs: table pre-dates the columns).
+  // Contacts deep-sweep cursor (existing installs: table pre-dates the column).
   `ALTER TABLE contacts_state ADD COLUMN page_token TEXT`,
-  `ALTER TABLE contacts_state ADD COLUMN messages_scanned INTEGER NOT NULL DEFAULT 0`,
 ];

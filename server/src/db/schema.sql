@@ -46,6 +46,5 @@ CREATE TABLE IF NOT EXISTS known_contacts (
 CREATE TABLE IF NOT EXISTS contacts_state (
   id INTEGER PRIMARY KEY CHECK (id = 1),
   backfilled_at TEXT,
-  page_token TEXT,
-  messages_scanned INTEGER NOT NULL DEFAULT 0
+  page_token TEXT
 );

@@ -20,6 +20,7 @@ export interface MailProvider {
   // opts.full=false fetches headers/snippet only (cheap, for list views);
   // full=true (default) fetches bodies/attachments too (for reading a thread).
   getThread(threadId: string, opts?: { full?: boolean }): Promise<MailThread>;
+
   getMessage(messageId: string): Promise<MailMessage>;
 
   getAttachment(
@@ -28,12 +29,15 @@ export interface MailProvider {
   ): Promise<{ data: Buffer; mimeType: string; filename: string }>;
 
   // Distinct addresses from mail headers (sent + received), for seeding the
-  // compose recipient autocomplete. Metadata-only list calls, bounded per
-  // call; the route resumes with the returned pageToken on later runs until
-  // nextPageToken comes back undefined (whole mailbox covered).
+  // compose recipient autocomplete. Bounded per call; the route resumes with
+  // the returned pageToken on later runs until nextPageToken comes back
+  // undefined (whole mailbox covered). onPageToken fires after every
+  // completed page so the route can persist the cursor incrementally — a
+  // restart then loses at most one page, not the batch.
   listRecentAddresses(opts?: {
     maxMessages?: number;
     pageToken?: string;
+    onPageToken?: (pageToken: string) => void;
   }): Promise<{ addresses: HarvestedAddress[]; nextPageToken?: string }>;
 
   getHistorySince(historyId: string): Promise<{ changes: HistoryChange[]; newHistoryId: string }>;

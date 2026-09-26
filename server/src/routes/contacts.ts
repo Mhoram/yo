@@ -30,7 +30,13 @@ export function contactsRouter(mailProvider: MailProvider): Router {
 
         const resumeToken = getBackfillPageToken();
         const [{ addresses: harvested, nextPageToken }, myEmail] = await Promise.all([
-          mailProvider.listRecentAddresses({ maxMessages: 1000, pageToken: resumeToken }),
+          mailProvider.listRecentAddresses({
+            maxMessages: 1000,
+            pageToken: resumeToken,
+            // Cursor is persisted after every page, not just at batch end,
+            // so a restart mid-sweep resumes where it left off.
+            onPageToken: (t) => setBackfillPageToken(t),
+          }),
           mailProvider.getMyEmailAddress(),
         ]);
         const blocked = new Set(listBlockedEmails());

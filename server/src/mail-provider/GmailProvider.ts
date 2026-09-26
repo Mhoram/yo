@@ -216,16 +216,18 @@ export class GmailProvider implements MailProvider {
   // Bounded by maxMessages and resumable: the route feeds back nextPageToken
   // on later runs until the whole mailbox has been swept.
   async listRecentAddresses(
-    opts?: { maxMessages?: number; pageToken?: string },
+    opts?: { maxMessages?: number; pageToken?: string; onPageToken?: (pageToken: string) => void },
   ): Promise<{ addresses: HarvestedAddress[]; nextPageToken?: string }> {
     const maxMessages = opts?.maxMessages ?? 1000;
     const seen = new Map<string, HarvestedAddress>();
     let scanned = 0;
 
     // Rolling-window pace limiter: at most GETS_PER_MIN messages.get calls
-    // per 60s (~200 quota units), leaving headroom for interactive calls
-    // sharing the same per-user quota window.
-    const GETS_PER_MIN = 10;
+    // per 60s. messages.get costs 5 quota units (metadata format included),
+    // so 40/min ≈ 200 units/min against Google's 250 units/min/user cap —
+    // full-speed concurrency was observed to 429 in seconds, and this still
+    // leaves headroom for interactive calls sharing the same window.
+    const GETS_PER_MIN = 40;
     const getTimes: number[] = [];
     const pace = async () => {
       const now = Date.now();
@@ -281,6 +283,10 @@ export class GmailProvider implements MailProvider {
             }
           }
         }
+
+        // Persist the cursor after every page so a mid-batch restart
+        // resumes from the last completed page instead of losing the run.
+        if (pageToken) opts?.onPageToken?.(pageToken);
 
         if (!pageToken) break;
       }
