@@ -1,7 +1,6 @@
 import type {
   HarvestedAddress,
   HistoryChange,
-  MailAddress,
   MailLabel,
   MailThread,
   MailMessage,
@@ -28,10 +27,14 @@ export interface MailProvider {
     attachmentId: string,
   ): Promise<{ data: Buffer; mimeType: string; filename: string }>;
 
-  // Distinct addresses from recent mail headers (sent + received), for
-  // seeding the compose recipient autocomplete. Metadata-only list calls;
-  // the contacts cache is seeded from this at most daily, not per keystroke.
-  listRecentAddresses(maxResults: number): Promise<HarvestedAddress[]>;
+  // Distinct addresses from mail headers (sent + received), for seeding the
+  // compose recipient autocomplete. Metadata-only list calls, bounded per
+  // call; the route resumes with the returned pageToken on later runs until
+  // nextPageToken comes back undefined (whole mailbox covered).
+  listRecentAddresses(opts?: {
+    maxMessages?: number;
+    pageToken?: string;
+  }): Promise<{ addresses: HarvestedAddress[]; nextPageToken?: string }>;
 
   getHistorySince(historyId: string): Promise<{ changes: HistoryChange[]; newHistoryId: string }>;
   getCurrentHistoryId(): Promise<string>;

@@ -70,6 +70,17 @@ export function isBackfillFresh(): boolean {
   return Date.now() - new Date(at).getTime() < MAX_BACKFILL_AGE_MS;
 }
 
+// Cursor for the multi-day deep sweep: null/undefined = start from the top.
+export function getBackfillPageToken(): string | undefined {
+  return (db.prepare('SELECT page_token FROM contacts_state WHERE id = 1').get() as
+    | { page_token: string | null }
+    | undefined)?.page_token ?? undefined;
+}
+
+export function setBackfillPageToken(pageToken: string | null): void {
+  db.prepare('UPDATE contacts_state SET page_token = ? WHERE id = 1').run(pageToken);
+}
+
 export function markBackfilled(): void {
   db.prepare(
     `INSERT INTO contacts_state (id, backfilled_at) VALUES (1, @now)

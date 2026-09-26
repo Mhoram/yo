@@ -107,8 +107,8 @@ export class FakeMailProvider implements MailProvider {
   // Test-seedable; contacts backfill tests can point this at fixtures.
   public recentAddresses: HarvestedAddress[] = [];
 
-  async listRecentAddresses(maxResults: number): Promise<HarvestedAddress[]> {
-    return this.recentAddresses.slice(0, maxResults);
+  async listRecentAddresses(): Promise<{ addresses: HarvestedAddress[]; nextPageToken?: string }> {
+    return { addresses: this.recentAddresses, nextPageToken: undefined };
   }
 
   async getAttachment(): ReturnType<MailProvider['getAttachment']> {

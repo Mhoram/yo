@@ -3,6 +3,8 @@ import type { MailProvider } from '../mail-provider/MailProvider.js';
 import {
   listKnownContacts,
   isBackfillFresh,
+  getBackfillPageToken,
+  setBackfillPageToken,
   markBackfilled,
   seedApprovedSenders,
   upsertContact,
@@ -19,14 +21,17 @@ export function contactsRouter(mailProvider: MailProvider): Router {
     try {
       seedApprovedSenders();
 
-      // One-time-ish backfill from mailbox headers (sent + received). If
-      // Gmail fails (offline, quota, revoked token), still serve whatever
+      // Incremental backfill from mailbox headers (sent + received). Each
+      // run (at most daily) sweeps ~1000 more messages deeper into history,
+      // resuming from the stored cursor, until the whole mailbox is covered.
+      // If Gmail fails (offline, quota, revoked token), still serve whatever
       // the local cache has rather than erroring the compose page's
       // autocomplete.
       if (!isBackfillFresh()) {
         try {
-          const [harvested, myEmail] = await Promise.all([
-            mailProvider.listRecentAddresses(1000),
+          const resumeToken = getBackfillPageToken();
+          const [{ addresses: harvested, nextPageToken }, myEmail] = await Promise.all([
+            mailProvider.listRecentAddresses({ maxMessages: 1000, pageToken: resumeToken }),
             mailProvider.getMyEmailAddress(),
           ]);
           const blocked = new Set(listBlockedEmails());
@@ -41,7 +46,9 @@ export function contactsRouter(mailProvider: MailProvider): Router {
             // elsewhere.
             upsertContact(address.email, address.name ?? null, source === 'sent');
           }
+
           markBackfilled();
+          setBackfillPageToken(nextPageToken ?? null);
         } catch (err) {
           console.error('Contacts backfill from mailbox headers failed; serving local cache', err);
         }

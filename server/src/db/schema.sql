@@ -40,9 +40,12 @@ CREATE TABLE IF NOT EXISTS known_contacts (
   last_used_at TEXT NOT NULL
 );
 
--- One-row marker so the one-time sent-mail backfill (the only part of the
--- contacts feature that costs Gmail quota) runs at most once per day.
+-- One-row state for the contacts backfill (the only part of the contacts
+-- feature that costs Gmail quota). Runs at most once per day; page_token
+-- resumes a multi-day deep sweep through mailbox history until exhausted.
 CREATE TABLE IF NOT EXISTS contacts_state (
   id INTEGER PRIMARY KEY CHECK (id = 1),
-  backfilled_at TEXT
+  backfilled_at TEXT,
+  page_token TEXT,
+  messages_scanned INTEGER NOT NULL DEFAULT 0
 );
