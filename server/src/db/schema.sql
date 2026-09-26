@@ -41,10 +41,10 @@ CREATE TABLE IF NOT EXISTS known_contacts (
 );
 
 -- One-row state for the contacts backfill (the only part of the contacts
--- feature that costs Gmail quota). Runs at most once per day; page_token
--- resumes a multi-day deep sweep through mailbox history until exhausted.
+-- feature that costs Gmail quota). Runs at most once per day; the page_token
+-- column (added by migration, keeping schema.sql at the table's original
+-- shape) resumes a multi-day deep sweep through mailbox history.
 CREATE TABLE IF NOT EXISTS contacts_state (
   id INTEGER PRIMARY KEY CHECK (id = 1),
-  backfilled_at TEXT,
-  page_token TEXT
+  backfilled_at TEXT
 );

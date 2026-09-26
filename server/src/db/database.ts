@@ -28,7 +28,12 @@ import { migrations } from './migrations.js';
 for (const sql of migrations) {
   try {
     db.exec(sql);
-  } catch {
-    // column/table already exists; migrations are append-only and safe to re-run
+  } catch (e) {
+    // Migrations are append-only and safe to re-run: the only expected
+    // failure is that the change already exists. Swallow ONLY that — a
+    // different error (typo, disk issue) must be loud, not silently ignored.
+    const msg = e instanceof Error ? e.message : String(e);
+    if (/already exists|duplicate column/i.test(msg)) continue;
+    throw e;
   }
 }

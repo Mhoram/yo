@@ -66,6 +66,21 @@ describe('upsertContact', () => {
     upsertContact(email, null, false);
     expect(listKnownContacts().find((c) => c.email === email)?.name).toBe('From Sent Mail');
   });
+
+  it('an existing name wins over any new name (curated data is never clobbered)', () => {
+    const email = freshEmail();
+    upsertContact(email, 'Curated HEY Name');
+    upsertContact(email, 'Harvested Header Name');
+    upsertContact(email, 'Harvested Header Name', false);
+    expect(listKnownContacts().find((c) => c.email === email)?.name).toBe('Curated HEY Name');
+  });
+
+  it('fills in a name when none was stored yet, regardless of touch', () => {
+    const a = freshEmail();
+    upsertContact(a, null, true);
+    upsertContact(a, 'Later Name', true);
+    expect(listKnownContacts().find((c) => c.email === a)?.name).toBe('Later Name');
+  });
 });
 
 describe('seedApprovedSenders', () => {

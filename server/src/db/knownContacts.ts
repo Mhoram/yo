@@ -24,7 +24,7 @@ export function upsertContact(email: string, name: string | null = null, touch =
     `INSERT INTO known_contacts (email, name, use_count, last_used_at)
      VALUES (@email, @name, @bump, @now)
      ON CONFLICT(email) DO UPDATE SET
-       name = COALESCE(excluded.name, known_contacts.name),
+       name = COALESCE(known_contacts.name, excluded.name),
        use_count = known_contacts.use_count + @bump,
        last_used_at = CASE WHEN @touch = 1 THEN @now ELSE known_contacts.last_used_at END`,
   ).run({

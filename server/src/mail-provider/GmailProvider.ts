@@ -239,11 +239,16 @@ export class GmailProvider implements MailProvider {
       getTimes.push(Date.now());
     };
 
+    // persist: only the all-mail sweep's cursor is resumable. The sent
+    // sweep is capped and cheap, so it's effectively atomic — its page
+    // tokens are scoped to the SENT query and must never be fed back into
+    // the all-mail sweep after a restart (Google rejects foreign tokens).
     const sweep = async (
       labelIds: string[] | undefined,
       keepSpamTrash: boolean,
       startToken: string | undefined,
       pageCap: number,
+      persist = false,
     ): Promise<string | undefined> => {
       let pageToken = startToken;
       let pages = 0;
@@ -286,7 +291,7 @@ export class GmailProvider implements MailProvider {
 
         // Persist the cursor after every page so a mid-batch restart
         // resumes from the last completed page instead of losing the run.
-        if (pageToken) opts?.onPageToken?.(pageToken);
+        if (pageToken && persist) opts?.onPageToken?.(pageToken);
 
         if (!pageToken) break;
       }
@@ -296,12 +301,12 @@ export class GmailProvider implements MailProvider {
     // Resuming a prior run: the sent sweep already happened, continue the
     // all-mail sweep from the stored cursor.
     if (opts?.pageToken) {
-      const token = await sweep(undefined, false, opts.pageToken, Math.ceil(maxMessages / 100));
+      const token = await sweep(undefined, false, opts.pageToken, Math.ceil(maxMessages / 100), true);
       return { addresses: Array.from(seen.values()), nextPageToken: token };
     }
 
     await sweep(['SENT'], true, undefined, 10);
-    const token = await sweep(undefined, false, undefined, Math.ceil(maxMessages / 100));
+    const token = await sweep(undefined, false, undefined, Math.ceil(maxMessages / 100), true);
     return { addresses: Array.from(seen.values()), nextPageToken: token };
   }
 
