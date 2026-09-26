@@ -190,6 +190,23 @@ ends up owned by `root` on the host, since the container runs as root. That's
 fine, it just means you'll need `sudo` to inspect or copy `yo.db` from the
 host.
 
+**"Failed to load: invalid_grant", mail stops loading**: the stored refresh
+token is dead. The app's own `/auth/status` check only confirms a token row
+exists, not that it still works, so the UI looks signed-in while every Gmail
+call fails. Fix: visit `https://<device>.<tailnet>.ts.net/auth/google`
+directly and sign in again — no container restart needed, the new token
+overwrites the old one immediately.
+
+The most common cause is the Google Cloud OAuth client still sitting in
+**Testing** publishing status: refresh tokens issued in Testing mode expire
+after 7 days no matter how often the app is used, so this recurs weekly until
+fixed. In Google Cloud Console, go to **Google Auth Platform → Audience**
+(the OAuth consent screen settings moved here) and click **Publish app** to
+move it to **In production**. You don't need to complete Google's
+verification flow for a single-user personal deployment. Once published,
+tokens are only revoked if unused for 6 months or manually revoked at
+https://myaccount.google.com/permissions.
+
 ## 8. Nightly offsite backup
 
 The offsite copy is the primary safety net here. A home machine has no cloud

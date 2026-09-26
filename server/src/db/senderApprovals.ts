@@ -69,6 +69,12 @@ export function listPendingSenders(): SenderApproval[] {
     .all() as SenderApproval[];
 }
 
+export function listBlockedEmails(): string[] {
+  return (db.prepare("SELECT sender_email FROM sender_approvals WHERE status = 'blocked'").all() as {
+    sender_email: string;
+  }[]).map((r) => r.sender_email);
+}
+
 export function listBlockedSenders(): SenderApproval[] {
   return db
     .prepare("SELECT * FROM sender_approvals WHERE status = 'blocked' ORDER BY decided_at DESC")

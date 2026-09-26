@@ -1,5 +1,5 @@
 import type { MailProvider } from '../mail-provider/MailProvider.js';
-import type { HistoryChange, MailLabel, MailThread } from '../mail-provider/types.js';
+import type { HarvestedAddress, HistoryChange, MailLabel, MailThread } from '../mail-provider/types.js';
 
 interface FakeThread {
   id: string;
@@ -102,6 +102,13 @@ export class FakeMailProvider implements MailProvider {
 
   async getMessage(): ReturnType<MailProvider['getMessage']> {
     throw new Error('not implemented in FakeMailProvider');
+  }
+
+  // Test-seedable; contacts backfill tests can point this at fixtures.
+  public recentAddresses: HarvestedAddress[] = [];
+
+  async listRecentAddresses(): Promise<{ addresses: HarvestedAddress[]; nextPageToken?: string }> {
+    return { addresses: this.recentAddresses, nextPageToken: undefined };
   }
 
   async getAttachment(): ReturnType<MailProvider['getAttachment']> {

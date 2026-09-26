@@ -28,3 +28,23 @@ CREATE TABLE IF NOT EXISTS sender_approvals (
 
 CREATE INDEX IF NOT EXISTS idx_sender_approvals_status ON sender_approvals(status);
 CREATE INDEX IF NOT EXISTS idx_sender_approvals_domain ON sender_approvals(sender_domain);
+
+-- Cache of addresses worth suggesting in the compose To/Cc/Bcc fields:
+-- harvested from recent sent + received mail headers, plus
+-- gatekeeper-approved senders. Blocked senders and the user's own address
+-- are excluded at seeding time.
+CREATE TABLE IF NOT EXISTS known_contacts (
+  email TEXT PRIMARY KEY,
+  name TEXT,
+  use_count INTEGER NOT NULL DEFAULT 0,
+  last_used_at TEXT NOT NULL
+);
+
+-- One-row state for the contacts backfill (the only part of the contacts
+-- feature that costs Gmail quota). Runs at most once per day; the page_token
+-- column (added by migration, keeping schema.sql at the table's original
+-- shape) resumes a multi-day deep sweep through mailbox history.
+CREATE TABLE IF NOT EXISTS contacts_state (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  backfilled_at TEXT
+);

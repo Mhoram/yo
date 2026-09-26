@@ -2,10 +2,18 @@ import { google, gmail_v1 } from 'googleapis';
 import { OAuth2Client } from 'google-auth-library';
 import MailComposer from 'nodemailer/lib/mail-composer';
 import type { MailProvider } from './MailProvider.js';
-import type { HistoryChange, MailLabel, MailMessage, MailThread, OutgoingMessage } from './types.js';
-import { parseGmailMessage } from './mimeParser.js';
+import type {
+  HarvestedAddress,
+  HistoryChange,
+  MailLabel,
+  MailMessage,
+  MailThread,
+  OutgoingMessage,
+} from './types.js';
+import { parseAddressList, parseGmailMessage } from './mimeParser.js';
 import { loadTokens, saveTokens } from '../db/oauthTokenStore.js';
 import { recordCall } from '../lib/quotaTracker.js';
+import { mapWithConcurrency } from '../lib/concurrency.js';
 
 const SCOPES = [
   'https://www.googleapis.com/auth/gmail.modify',
@@ -193,6 +201,115 @@ export class GmailProvider implements MailProvider {
     };
   }
 
+  // Harvests address headers (From/To/Cc) for the compose autocomplete.
+  // messages.list does NOT return headers (only ids/labels), so this lists
+  // ids cheaply then fetches each message metadata-only — 20 quota units
+  // each, so the sweep paces itself well under Google's 250 units/min/user
+  // limit and must run in the background, never blocking a request. Sent
+  // mail is swept first (its addresses rank higher as things you chose to
+  // write to), then all mail for people who have written to you; an address
+  // seen in both keeps the 'sent' source. All-mail rather than INBOX-only
+  // because yo's gatekeeper strips INBOX from approved mail into its own
+  // bucket labels — an INBOX sweep would mostly miss regular correspondents
+  // on an actively-used install.
+  //
+  // Bounded by maxMessages and resumable: the route feeds back nextPageToken
+  // on later runs until the whole mailbox has been swept.
+  async listRecentAddresses(
+    opts?: { maxMessages?: number; pageToken?: string; onPageToken?: (pageToken: string) => void },
+  ): Promise<{ addresses: HarvestedAddress[]; nextPageToken?: string }> {
+    const maxMessages = opts?.maxMessages ?? 1000;
+    const seen = new Map<string, HarvestedAddress>();
+    let scanned = 0;
+
+    // Rolling-window pace limiter: at most GETS_PER_MIN messages.get calls
+    // per 60s. messages.get costs 5 quota units (metadata format included),
+    // so 40/min ≈ 200 units/min against Google's 250 units/min/user cap —
+    // full-speed concurrency was observed to 429 in seconds, and this still
+    // leaves headroom for interactive calls sharing the same window.
+    const GETS_PER_MIN = 40;
+    const getTimes: number[] = [];
+    const pace = async () => {
+      const now = Date.now();
+      while (getTimes.length > 0 && now - getTimes[0] > 60_000) getTimes.shift();
+      if (getTimes.length >= GETS_PER_MIN) {
+        const waitMs = 60_000 - (now - getTimes[0]) + 100;
+        await new Promise((r) => setTimeout(r, waitMs));
+      }
+      getTimes.push(Date.now());
+    };
+
+    // persist: only the all-mail sweep's cursor is resumable. The sent
+    // sweep is capped and cheap, so it's effectively atomic — its page
+    // tokens are scoped to the SENT query and must never be fed back into
+    // the all-mail sweep after a restart (Google rejects foreign tokens).
+    const sweep = async (
+      labelIds: string[] | undefined,
+      keepSpamTrash: boolean,
+      startToken: string | undefined,
+      pageCap: number,
+      persist = false,
+    ): Promise<string | undefined> => {
+      let pageToken = startToken;
+      let pages = 0;
+      while (pages < pageCap && scanned < maxMessages) {
+        recordCall('messages.list');
+        const res = await this.gmail.users.messages.list({
+          userId: 'me',
+          labelIds,
+          // Keep spam/trash out of the address book.
+          q: keepSpamTrash ? undefined : '-in:spam -in:trash',
+          maxResults: Math.min(100, maxMessages - scanned),
+          pageToken,
+        });
+        const msgs = res.data.messages ?? [];
+        pages += 1;
+        pageToken = res.data.nextPageToken ?? undefined;
+        if (msgs.length === 0) break;
+
+        for (const m of msgs) {
+          if (scanned >= maxMessages) break;
+          await pace();
+          recordCall('messages.get');
+          const full = await this.gmail.users.messages.get({
+            userId: 'me',
+            id: m.id!,
+            format: 'metadata',
+            metadataHeaders: ['From', 'To', 'Cc'],
+          });
+          scanned += 1;
+          const source: HarvestedAddress['source'] = full.data.labelIds?.includes('SENT') ? 'sent' : 'received';
+          for (const h of full.data.payload?.headers ?? []) {
+            const name = h.name?.toLowerCase();
+            if (name !== 'from' && name !== 'to' && name !== 'cc') continue;
+            for (const addr of parseAddressList(h.value ?? '')) {
+              const key = addr.email.toLowerCase();
+              if (!seen.has(key)) seen.set(key, { address: addr, source });
+            }
+          }
+        }
+
+        // Persist the cursor after every page so a mid-batch restart
+        // resumes from the last completed page instead of losing the run.
+        if (pageToken && persist) opts?.onPageToken?.(pageToken);
+
+        if (!pageToken) break;
+      }
+      return pageToken;
+    };
+
+    // Resuming a prior run: the sent sweep already happened, continue the
+    // all-mail sweep from the stored cursor.
+    if (opts?.pageToken) {
+      const token = await sweep(undefined, false, opts.pageToken, Math.ceil(maxMessages / 100), true);
+      return { addresses: Array.from(seen.values()), nextPageToken: token };
+    }
+
+    await sweep(['SENT'], true, undefined, 10);
+    const token = await sweep(undefined, false, undefined, Math.ceil(maxMessages / 100), true);
+    return { addresses: Array.from(seen.values()), nextPageToken: token };
+  }
+
   async getHistorySince(historyId: string): Promise<{ changes: HistoryChange[]; newHistoryId: string }> {
     recordCall('history.list');
     const res = await this.gmail.users.history.list({
@@ -249,6 +366,7 @@ export class GmailProvider implements MailProvider {
     const composer = new MailComposer({
       to: msg.to.join(', '),
       cc: msg.cc && msg.cc.length > 0 ? msg.cc.join(', ') : undefined,
+      bcc: msg.bcc && msg.bcc.length > 0 ? msg.bcc.join(', ') : undefined,
       subject: msg.subject,
       text: msg.bodyText,
       html: msg.bodyHtml,

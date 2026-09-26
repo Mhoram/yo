@@ -37,7 +37,7 @@ export function ThreadRow({ thread, perspective = 'received' }: { thread: Thread
           <span className="block truncate text-[0.9rem] font-semibold sm:text-lg">{thread.subject}</span>
           <span className="block truncate text-[0.8rem] text-muted-foreground sm:text-base">
             {sent ? `To: ${counterpartyLabel}` : counterpartyLabel}
-            {thread.snippet && <> — {thread.snippet}</>}
+            {thread.snippet && <> - {thread.snippet}</>}
           </span>
         </span>
         {thread.date && (

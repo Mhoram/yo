@@ -63,6 +63,11 @@ export interface BlockedSender {
 
 export type ApprovalBucket = 'yobox' | 'receipts' | 'feed';
 
+export interface KnownContact {
+  email: string;
+  name: string | null;
+}
+
 export interface OutgoingAttachment {
   filename: string;
   contentBase64: string;
@@ -130,9 +135,11 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(opts),
     }),
+  listContacts: () => request<{ contacts: KnownContact[] }>('/api/contacts'),
   composeMessage: (opts: {
     to: string[];
     cc?: string[];
+    bcc?: string[];
     subject: string;
     bodyText: string;
     bodyHtml?: string;

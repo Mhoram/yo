@@ -8,6 +8,7 @@ import { buildReplyEnvelope } from '../lib/replyEnvelope.js';
 import { buildForwardEnvelope } from '../lib/forwardEnvelope.js';
 import { parseAttachments } from '../lib/attachments.js';
 import { buildThreadSummary } from '../lib/threadSummary.js';
+import { recordOutgoingRecipients } from '../db/knownContacts.js';
 
 export function threadsRouter(mailProvider: MailProvider): Router {
   const router = Router();
@@ -182,6 +183,8 @@ export function threadsRouter(mailProvider: MailProvider): Router {
         attachments,
       });
 
+      recordOutgoingRecipients([envelope.to, envelope.cc]);
+
       res.json(result);
     } catch (err) {
       console.error('Failed to send reply', err);
@@ -212,6 +215,10 @@ export function threadsRouter(mailProvider: MailProvider): Router {
 
       const envelope = buildForwardEnvelope(last, to, typeof note === 'string' ? note : undefined);
       const result = await mailProvider.sendMessage({ ...envelope, attachments });
+
+      // ForwardEnvelope has no cc — forwards only address `to` directly.
+      recordOutgoingRecipients([envelope.to]);
+
       res.json(result);
     } catch (err) {
       console.error('Failed to forward thread', err);
