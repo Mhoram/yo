@@ -7,6 +7,7 @@ import {
   seedApprovedSenders,
   upsertContact,
 } from '../db/knownContacts.js';
+import { listBlockedEmails } from '../db/senderApprovals.js';
 
 // Recipient autocomplete source. The list is built from local SQLite only —
 // nothing here costs Gmail quota on the hot path except the (daily, capped)
@@ -18,20 +19,31 @@ export function contactsRouter(mailProvider: MailProvider): Router {
     try {
       seedApprovedSenders();
 
-      // One-time-ish backfill from the user's sent mail. If Gmail fails
-      // (offline, quota, revoked token), still serve whatever the local
-      // cache has rather than erroring the compose page's autocomplete.
+      // One-time-ish backfill from mailbox headers (sent + received). If
+      // Gmail fails (offline, quota, revoked token), still serve whatever
+      // the local cache has rather than erroring the compose page's
+      // autocomplete.
       if (!isBackfillFresh()) {
         try {
-          const recipients = await mailProvider.listSentRecipients(300);
-          for (const r of recipients) {
-            // Lowest-precedence seed: don't bump counts or touch recency,
-            // and never overwrite a name already learned elsewhere.
-            upsertContact(r.email, r.name ?? null, false);
+          const [harvested, myEmail] = await Promise.all([
+            mailProvider.listRecentAddresses(1000),
+            mailProvider.getMyEmailAddress(),
+          ]);
+          const blocked = new Set(listBlockedEmails());
+          const mine = myEmail.toLowerCase();
+
+          for (const { address, source } of harvested) {
+            if (address.email.toLowerCase() === mine || blocked.has(address.email.toLowerCase())) continue;
+            // Sent-mail addresses get a real use_count bump (things you chose
+            // to write to rank above things that merely landed in the
+            // inbox); received-only addresses are the lowest-precedence
+            // seed: no count bump, and never overwrite a name learned
+            // elsewhere.
+            upsertContact(address.email, address.name ?? null, source === 'sent');
           }
           markBackfilled();
         } catch (err) {
-          console.error('Contacts backfill from sent mail failed; serving local cache', err);
+          console.error('Contacts backfill from mailbox headers failed; serving local cache', err);
         }
       }
 

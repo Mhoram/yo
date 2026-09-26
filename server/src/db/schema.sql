@@ -30,9 +30,9 @@ CREATE INDEX IF NOT EXISTS idx_sender_approvals_status ON sender_approvals(statu
 CREATE INDEX IF NOT EXISTS idx_sender_approvals_domain ON sender_approvals(sender_domain);
 
 -- Cache of addresses worth suggesting in the compose To/Cc/Bcc fields:
--- recipients of the user's own sent mail plus gatekeeper-approved senders.
--- Blocked and pending senders are deliberately excluded (suggestion-worthy
--- means you chose to talk to them, not that they emailed you once).
+-- harvested from recent sent + received mail headers, plus
+-- gatekeeper-approved senders. Blocked senders and the user's own address
+-- are excluded at seeding time.
 CREATE TABLE IF NOT EXISTS known_contacts (
   email TEXT PRIMARY KEY,
   name TEXT,

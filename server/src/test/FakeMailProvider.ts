@@ -1,5 +1,5 @@
 import type { MailProvider } from '../mail-provider/MailProvider.js';
-import type { HistoryChange, MailAddress, MailLabel, MailThread } from '../mail-provider/types.js';
+import type { HarvestedAddress, HistoryChange, MailLabel, MailThread } from '../mail-provider/types.js';
 
 interface FakeThread {
   id: string;
@@ -105,10 +105,10 @@ export class FakeMailProvider implements MailProvider {
   }
 
   // Test-seedable; contacts backfill tests can point this at fixtures.
-  public sentRecipients: MailAddress[] = [];
+  public recentAddresses: HarvestedAddress[] = [];
 
-  async listSentRecipients(maxResults: number): Promise<MailAddress[]> {
-    return this.sentRecipients.slice(0, maxResults);
+  async listRecentAddresses(maxResults: number): Promise<HarvestedAddress[]> {
+    return this.recentAddresses.slice(0, maxResults);
   }
 
   async getAttachment(): ReturnType<MailProvider['getAttachment']> {

@@ -2,7 +2,14 @@ import { google, gmail_v1 } from 'googleapis';
 import { OAuth2Client } from 'google-auth-library';
 import MailComposer from 'nodemailer/lib/mail-composer';
 import type { MailProvider } from './MailProvider.js';
-import type { HistoryChange, MailAddress, MailLabel, MailMessage, MailThread, OutgoingMessage } from './types.js';
+import type {
+  HarvestedAddress,
+  HistoryChange,
+  MailLabel,
+  MailMessage,
+  MailThread,
+  OutgoingMessage,
+} from './types.js';
 import { parseAddressList, parseGmailMessage } from './mimeParser.js';
 import { loadTokens, saveTokens } from '../db/oauthTokenStore.js';
 import { recordCall } from '../lib/quotaTracker.js';
@@ -193,35 +200,42 @@ export class GmailProvider implements MailProvider {
     };
   }
 
-  // Metadata-only pages over recent SENT mail (5 quota units/page of 100,
-  // not the 50+/thread a full fetch would cost) harvesting To/Cc headers.
-  async listSentRecipients(maxResults: number): Promise<MailAddress[]> {
-    const seen = new Map<string, MailAddress>();
-    let pageToken: string | undefined;
+  // Metadata-only pages over recent mail (5 quota units per page of 100,
+  // not the 50+/thread a full fetch would cost) harvesting address headers.
+  // Sent mail is swept first (its addresses rank higher as things you chose
+  // to write to), then the inbox for people who have written to you. An
+  // address seen in both keeps the 'sent' source.
+  async listRecentAddresses(maxResults: number): Promise<HarvestedAddress[]> {
+    const seen = new Map<string, HarvestedAddress>();
 
-    while (seen.size < maxResults) {
-      recordCall('messages.list');
-      const res = await this.gmail.users.messages.list({
-        userId: 'me',
-        labelIds: ['SENT'],
-        maxResults: Math.min(100, maxResults - seen.size),
-        pageToken,
-      });
+    const harvest = async (labelIds: string[], wanted: Set<string>, source: HarvestedAddress['source']) => {
+      let pageToken: string | undefined;
+      while (seen.size < maxResults) {
+        recordCall('messages.list');
+        const res = await this.gmail.users.messages.list({
+          userId: 'me',
+          labelIds,
+          maxResults: Math.min(100, maxResults - seen.size),
+          pageToken,
+        });
 
-      for (const m of res.data.messages ?? []) {
-        const headers = m.payload?.headers ?? [];
-        for (const h of headers) {
-          if (h.name?.toLowerCase() !== 'to' && h.name?.toLowerCase() !== 'cc') continue;
-          for (const addr of parseAddressList(h.value ?? '')) {
-            const key = addr.email.toLowerCase();
-            if (!seen.has(key)) seen.set(key, addr);
+        for (const m of res.data.messages ?? []) {
+          for (const h of m.payload?.headers ?? []) {
+            if (!wanted.has(h.name?.toLowerCase() ?? '')) continue;
+            for (const addr of parseAddressList(h.value ?? '')) {
+              const key = addr.email.toLowerCase();
+              if (!seen.has(key)) seen.set(key, { address: addr, source });
+            }
           }
         }
-      }
 
-      pageToken = res.data.nextPageToken ?? undefined;
-      if (!pageToken) break;
-    }
+        pageToken = res.data.nextPageToken ?? undefined;
+        if (!pageToken) break;
+      }
+    };
+
+    await harvest(['SENT'], new Set(['to', 'cc']), 'sent');
+    await harvest(['INBOX'], new Set(['from', 'to', 'cc']), 'received');
 
     return Array.from(seen.values());
   }

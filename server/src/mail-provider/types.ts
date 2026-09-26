@@ -57,6 +57,14 @@ export interface OutgoingAttachment {
   contentType?: string;
 }
 
+// An address seen while harvesting mailbox headers for the compose
+// autocomplete, plus where it was seen: 'sent' (you chose to write to it —
+// ranks higher) or 'received' (it appeared in From/To/Cc of your inbox).
+export interface HarvestedAddress {
+  address: MailAddress;
+  source: 'sent' | 'received';
+}
+
 export interface OutgoingMessage {
   to: string[];
   cc?: string[];
