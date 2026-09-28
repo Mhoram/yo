@@ -18,11 +18,22 @@
 
 body {
   @apply bg-background text-foreground font-sans;
-  /* Horizon glow: a faint neon green sky above, cyan haze below. */
+  /* Horizon glow, dialed per theme: neon sky above / cyan haze below in
+     dark mode; a barely-there green breath in light mode (the neon at full
+     strength looks toxic on white). */
+  background-attachment: fixed;
+}
+
+html.dark body {
   background-image:
     radial-gradient(ellipse 80% 50% at 50% -10%, hsl(113 100% 50% / 0.10), transparent 70%),
     radial-gradient(ellipse 60% 40% at 80% 110%, hsl(190 100% 50% / 0.07), transparent 70%);
-  background-attachment: fixed;
+}
+
+html:not(.dark) body {
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% -10%, hsl(113 70% 40% / 0.045), transparent 70%),
+    radial-gradient(ellipse 60% 40% at 80% 110%, hsl(190 80% 40% / 0.03), transparent 70%);
 }
 
 /* TipTap wraps each list item's text in its own <p> (`<li><p>text</p></li>`)

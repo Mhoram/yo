@@ -4,6 +4,7 @@ import { usePendingSenders } from '../hooks/useGatekeeper';
 import { useSearchPreview } from '../hooks/useSearch';
 import { Avatar } from './Avatar';
 import { BoxMenuButton } from './BoxMenuButton';
+import { ThemeToggle } from './ThemeToggle';
 
 function SearchIcon() {
   return (
@@ -77,6 +78,7 @@ export function NavBar() {
       <nav className="mx-auto flex flex-col gap-3 px-6 pt-6 sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:pt-8">
         <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:gap-6">
           <BoxMenuButton />
+          <ThemeToggle />
           <div className="relative w-full sm:w-auto" ref={containerRef}>
             <span className="pointer-events-none absolute inset-y-0 left-2.5 flex items-center">
               <SearchIcon />

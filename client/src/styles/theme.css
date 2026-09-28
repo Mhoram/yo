@@ -1,6 +1,40 @@
 :root {
-  /* Neon green on deep green-black: terminal-bright primary, violet-free
-     dark surfaces, cyan as the secondary accent. */
+  color-scheme: light;
+  /* Light mode (default): the same green identity on paper. Text goes deep
+     green-black instead of black-black to keep the tint consistent; primary
+     darkens from neon #39FF14 (unreadable on white) to a deep green that
+     still reads as the brand, swapping its foreground to white. */
+  --background: 120 33% 98%; /* #F7FAF8 — paper with a green breath */
+  --foreground: 150 25% 12%; /* deep green-black */
+  --card: 0 0% 100%; /* white cards on the tinted background */
+  --muted: 140 20% 94%;
+  --muted-foreground: 150 14% 35%;
+  --border: 140 20% 84%;
+
+  --primary: 145 75% 28%; /* deep brand green, readable on white */
+  --primary-foreground: 120 30% 98%;
+
+  --unread-dot: 190 90% 35%; /* cyan-blue, darkened for light surfaces */
+  --verified-icon: 174 85% 30%;
+
+  /* Avatar background hues: decorative, identical in both themes (avatars
+     are color + white initials, so they carry their own contrast). */
+  --avatar-1: 45 100% 60%; /* amber */
+  --avatar-2: 190 100% 55%; /* cyan */
+  --avatar-3: 323 100% 62%; /* pink */
+  --avatar-4: 265 100% 66%; /* violet */
+  --avatar-5: 100 90% 55%; /* lime */
+  --avatar-6: 20 100% 60%; /* orange */
+  --avatar-7: 215 100% 65%; /* blue */
+  --avatar-8: 300 100% 60%; /* fuchsia */
+}
+
+/* Dark mode (the original theme): neon green on deep green-black. Applied
+   via an `html.dark` class set pre-paint by an inline script in index.html
+   (stored choice, else system preference) so there's no theme flash. */
+html.dark {
+  color-scheme: dark;
+
   --background: 150 25% 6%; /* #0B120D — near-black green */
   --foreground: 120 30% 96%; /* green-tinted white */
   --card: 150 22% 10%; /* #121C15 */
@@ -13,13 +47,4 @@
 
   --unread-dot: 190 100% 50%; /* #00CFF0, neon cyan */
   --verified-icon: 174 90% 50%; /* #0BE8CF, aqua */
-
-  --avatar-1: 45 100% 60%; /* amber */
-  --avatar-2: 190 100% 55%; /* cyan */
-  --avatar-3: 323 100% 62%; /* pink */
-  --avatar-4: 265 100% 66%; /* violet */
-  --avatar-5: 100 90% 55%; /* lime */
-  --avatar-6: 20 100% 60%; /* orange */
-  --avatar-7: 215 100% 65%; /* blue */
-  --avatar-8: 300 100% 60%; /* fuchsia */
 }
