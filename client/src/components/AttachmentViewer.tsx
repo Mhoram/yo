@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { PdfCanvas } from './PdfCanvas';
 
 export interface ViewingAttachment {
   url: string;
@@ -63,7 +64,7 @@ export function AttachmentViewer({ attachment, onClose }: { attachment: ViewingA
         </header>
 
         <div className="min-h-0 flex-1 bg-muted/40">
-          {isPdf && <iframe src={inlineUrl} title={filename} className="h-full w-full border-0" />}
+          {isPdf && <PdfCanvas url={url} />}
           {isImage && (
             <div className="flex h-full w-full items-center justify-center p-4">
               <img src={inlineUrl} alt={filename} className="max-h-full max-w-full object-contain" />
