@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { usePendingSenders } from '../hooks/useGatekeeper';
+import { ThemeMenuItem } from './ThemeToggle';
 
 const menuLinkClass = ({ isActive }: { isActive: boolean }) =>
   `block rounded-md px-3 py-2 text-sm font-semibold ${
@@ -66,6 +67,12 @@ export function BoxMenuButton() {
             <NavLink to="/gatekeeper" className={menuLinkClass} onClick={close}>
               Gatekeeper{pendingCount > 0 && ` (${pendingCount})`}
             </NavLink>
+            {/* Theme switch rides along in the popup on mobile — thumb-reachable
+                next to the box nav, instead of a cramped icon up top. The
+                desktop nav has its own compact toggle. */}
+            <div className="mt-1 border-t border-border pt-1 sm:hidden">
+              <ThemeMenuItem />
+            </div>
           </div>
         </>
       )}

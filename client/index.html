@@ -5,9 +5,23 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=3" />
     <link rel="apple-touch-icon" href="/icon-192.png?v=4" />
     <link rel="manifest" href="/manifest.webmanifest" />
+    <!-- Theme is set pre-paint (stored choice, else system preference) so
+         there's no light/dark flash on load. -->
     <meta name="theme-color" content="#0B120D" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>yo</title>
+    <script>
+      (function () {
+        var t = localStorage.getItem('yo-theme');
+        if (t !== 'light' && t !== 'dark') {
+          t = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+        }
+        var bg = t === 'dark' ? '#0B120D' : '#F7FAF8';
+        document.documentElement.classList.toggle('dark', t === 'dark');
+        document.documentElement.style.colorScheme = t;
+        document.querySelector('meta[name="theme-color"]').setAttribute('content', bg);
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

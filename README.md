@@ -22,6 +22,7 @@ What works today:
 - Sender logos via BIMI (the DNS-based brand logo system Gmail and Yahoo already use), with initials as fallback
 - PWA install (manifest, icons, service worker). No offline support yet.
 - Mobile layout: a popup box switcher that sits at the bottom of the screen on phones, condensed thread rows, a nav bar notice when senders are waiting on a Gatekeeper decision
+- Light mode: green-on-paper palette behind the same semantic tokens, toggle in the nav bar; first visit follows the system preference
 - Migration script if you're coming from HEY and want to keep your sender history (see [Scripts](#one-off-scripts))
 - Gmail API quota tracking and logging (see [Debugging](#debugging--telemetry))
 - Self-hosting via Docker, see [`deploy/self-host.md`](./deploy/self-host.md)
