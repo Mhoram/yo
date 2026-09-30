@@ -76,7 +76,9 @@ export function AttachmentViewer({ attachment, onClose }: { attachment: ViewingA
               <audio src={inlineUrl} controls className="w-full max-w-md" />
             </div>
           )}
-          {isText && <iframe src={inlineUrl} title={filename} className="h-full w-full border-0 bg-white" />}
+          {/* sandbox="" = fully locked down: text can render, nothing can
+              execute — defense-in-depth on top of the server's nosniff. */}
+          {isText && <iframe src={inlineUrl} title={filename} sandbox="" className="h-full w-full border-0 bg-white" />}
           {!isPdf && !isImage && !isVideo && !isAudio && !isText && (
             <div className="flex h-full w-full flex-col items-center justify-center gap-2 p-6 text-center">
               <p className="text-sm text-muted-foreground">No preview available for this file type.</p>

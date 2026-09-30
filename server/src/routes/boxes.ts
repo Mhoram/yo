@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import type { MailProvider } from '../mail-provider/MailProvider.js';
 import { BUCKET_LABELS } from '../gatekeeper/gatekeeperService.js';
+import { ensureLabel } from '../mail-provider/labelRegistry.js';
 
 export interface BoxCount {
   key: 'yobox' | 'receipts' | 'feed';
@@ -17,12 +18,19 @@ export function boxesRouter(mailProvider: MailProvider): Router {
   router.get('/', async (_req, res) => {
     try {
       const labels = await mailProvider.listLabels();
-      const unreadByName = new Map(labels.map((l) => [l.name, l.messagesUnread ?? 0]));
+      // Match labels by ID, not name: system label IDs are language-
+      // independent constants (INBOX is always 'INBOX'), and the buckets'
+      // IDs come straight from the label registry.
+      const unreadById = new Map(labels.map((l) => [l.id, l.messagesUnread ?? 0]));
+      const [receiptsId, feedId] = await Promise.all([
+        ensureLabel(mailProvider, BUCKET_LABELS.receipts),
+        ensureLabel(mailProvider, BUCKET_LABELS.feed),
+      ]);
 
       const boxes: BoxCount[] = [
-        { key: 'yobox', unread: unreadByName.get('INBOX') ?? 0 },
-        { key: 'receipts', unread: unreadByName.get(BUCKET_LABELS.receipts) ?? 0 },
-        { key: 'feed', unread: unreadByName.get(BUCKET_LABELS.feed) ?? 0 },
+        { key: 'yobox', unread: unreadById.get('INBOX') ?? 0 },
+        { key: 'receipts', unread: unreadById.get(receiptsId) ?? 0 },
+        { key: 'feed', unread: unreadById.get(feedId) ?? 0 },
       ];
       res.json({ boxes });
     } catch (err) {
