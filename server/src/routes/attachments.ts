@@ -13,9 +13,15 @@ export function attachmentsRouter(mailProvider: MailProvider): Router {
 
   router.get('/:messageId/:attachmentId', async (req, res) => {
     try {
+      // partIndex: the attachment's position in the parsed message's
+      // attachments array — the stable way to address it (Gmail rotates
+      // attachment IDs per fetch). Falls back to the ID lookup when absent.
+      const partParam = typeof req.query.part === 'string' ? req.query.part : undefined;
+      const partIndex = partParam && /^\d+$/.test(partParam) ? Number(partParam) : undefined;
       const { data, mimeType, filename } = await mailProvider.getAttachment(
         req.params.messageId,
         req.params.attachmentId,
+        { partIndex },
       );
       res.setHeader('Content-Type', mimeType);
       res.setHeader('X-Content-Type-Options', 'nosniff');

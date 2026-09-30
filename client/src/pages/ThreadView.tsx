@@ -291,8 +291,11 @@ export function ThreadView() {
                   {message.attachments.length === 1 ? 'Attachment' : `${message.attachments.length} attachments`}
                 </p>
                 <ul className="flex flex-wrap gap-2">
-                  {message.attachments.map((a) => {
-                    const url = `/api/attachments/${message.id}/${a.attachmentId}`;
+                  {message.attachments.map((a, partIndex) => {
+                    // partIndex addresses the attachment server-side; Gmail
+                    // rotates attachment IDs, so the ID alone mislabels the
+                    // response (octet-stream + "attachment").
+                    const url = `/api/attachments/${message.id}/${a.attachmentId}?part=${partIndex}`;
                     const isImage = a.mimeType.startsWith('image/');
                     return (
                       <li key={a.attachmentId}>
