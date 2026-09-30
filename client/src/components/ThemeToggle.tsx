@@ -19,7 +19,14 @@ export function setTheme(dark: boolean): void {
 // a time — so independent local state can't drift apart.
 export function useTheme(): { dark: boolean; toggle: () => void } {
   const [dark, setDark] = useState(() => document.documentElement.classList.contains('dark'));
-  return { dark, toggle: () => setDark(!dark) };
+  return {
+    dark,
+    toggle: () => {
+      const next = !dark;
+      setTheme(next);
+      setDark(next);
+    },
+  };
 }
 
 function SunIcon() {
