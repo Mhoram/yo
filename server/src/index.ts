@@ -14,6 +14,7 @@ import { composeRouter } from './routes/compose.js';
 import { attachmentsRouter } from './routes/attachments.js';
 import { searchRouter } from './routes/search.js';
 import { contactsRouter } from './routes/contacts.js';
+import { boxesRouter } from './routes/boxes.js';
 import { getQuotaSnapshot } from './lib/quotaTracker.js';
 
 const mailProvider = new GmailProvider(env.GOOGLE_CLIENT_ID, env.GOOGLE_CLIENT_SECRET, env.GOOGLE_REDIRECT_URI);
@@ -52,6 +53,7 @@ app.use('/api/compose', requireAuth, composeRouter(mailProvider));
 app.use('/api/attachments', requireAuth, attachmentsRouter(mailProvider));
 app.use('/api/search', requireAuth, searchRouter(mailProvider));
 app.use('/api/contacts', requireAuth, contactsRouter(mailProvider));
+app.use('/api/boxes', requireAuth, boxesRouter(mailProvider));
 app.get('/api/debug/quota', requireAuth, (_req, res) => res.json(getQuotaSnapshot()));
 
 // Self-hosted deploys run a single container, so this

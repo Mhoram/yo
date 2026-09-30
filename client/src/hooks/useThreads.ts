@@ -86,6 +86,10 @@ export function useMoveSenderBucket() {
     mutationFn: ({ email, bucket }: { email: string; bucket: ApprovalBucket }) => api.moveSenderBucket(email, bucket),
     onSuccess: ({ movedThreadIds }) => {
       if (movedThreadIds.length > 0) removeThreadsFromCache(queryClient, movedThreadIds);
+      // Moving can also approve a pending sender (see moveSenderToBucket),
+      // which empties their Gatekeeper queue and changes box unread counts.
+      queryClient.invalidateQueries({ queryKey: ['gatekeeper'] });
+      queryClient.invalidateQueries({ queryKey: ['boxes'] });
     },
   });
 }

@@ -214,17 +214,37 @@ describe('moveSenderToBucket', () => {
     expect(provider.modifyCalls.length).toBe(callsBefore);
   });
 
-  it('refuses to move a sender who has not been approved', async () => {
+  it('moving a pending sender approves them into the target bucket', async () => {
     const provider = new FakeMailProvider();
     const email = freshSender();
     provider.addThread({ id: 't1', from: email });
-    await gateThreadBySender(provider, { id: 't1', snippet: '' }, { email }); // now pending, not approved
+    await gateThreadBySender(provider, { id: 't1', snippet: '' }, { email }); // now pending
 
-    await expect(moveSenderToBucket(provider, email, 'feed')).rejects.toThrow(/not an approved sender/);
+    const { movedThreadIds } = await moveSenderToBucket(provider, email, 'feed');
+    expect(movedThreadIds).toEqual(['t1']);
+    const approval = getSenderApproval(email);
+    expect(approval?.status).toBe('approved');
+    expect(approval?.bucket).toBe('feed');
+    // Released from the pending label into the bucket label.
+    expect(provider.threadLabels('t1')).toContain(provider.labelIdFor('App/Feed')!);
+    expect(provider.threadLabels('t1')).not.toContain(provider.labelIdFor(GATEKEEPER_PENDING_LABEL)!);
   });
 
-  it('refuses to move a sender that does not exist at all', async () => {
+  it('moving an unknown sender (never gated) approves them too', async () => {
     const provider = new FakeMailProvider();
-    await expect(moveSenderToBucket(provider, freshSender(), 'feed')).rejects.toThrow(/not an approved sender/);
+    const email = freshSender();
+    const { movedThreadIds } = await moveSenderToBucket(provider, email, 'yobox');
+    expect(movedThreadIds).toEqual([]);
+    expect(getSenderApproval(email)?.status).toBe('approved');
+  });
+
+  it('still refuses to move a blocked sender', async () => {
+    const provider = new FakeMailProvider();
+    const email = freshSender();
+    provider.addThread({ id: 't1', from: email });
+    await gateThreadBySender(provider, { id: 't1', snippet: '' }, { email });
+    await blockSender(provider, email);
+
+    await expect(moveSenderToBucket(provider, email, 'feed')).rejects.toThrow(/blocked/);
   });
 });

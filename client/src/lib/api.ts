@@ -68,6 +68,11 @@ export interface KnownContact {
   name: string | null;
 }
 
+export interface MailBox {
+  key: 'yobox' | 'receipts' | 'feed';
+  unread: number;
+}
+
 export interface OutgoingAttachment {
   filename: string;
   contentBase64: string;
@@ -136,6 +141,7 @@ export const api = {
       body: JSON.stringify(opts),
     }),
   listContacts: () => request<{ contacts: KnownContact[] }>('/api/contacts'),
+  listBoxes: () => request<{ boxes: MailBox[] }>('/api/boxes'),
   composeMessage: (opts: {
     to: string[];
     cc?: string[];

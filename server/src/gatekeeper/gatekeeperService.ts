@@ -116,7 +116,7 @@ export async function approveSender(
   mailProvider: MailProvider,
   email: string,
   bucket: ApprovalBucket = 'yobox',
-): Promise<void> {
+): Promise<string[]> {
   decideSender(email, 'approved', bucket === 'yobox' ? null : bucket);
   const pendingLabelId = await ensureLabel(mailProvider, GATEKEEPER_PENDING_LABEL);
   const threadIds = await findHeldThreadIds(mailProvider, email);
@@ -131,6 +131,7 @@ export async function approveSender(
       mailProvider.modifyThreadLabels(id, { add: [bucketLabelId], remove: [pendingLabelId, 'INBOX'] }),
     );
   }
+  return threadIds;
 }
 
 export async function blockSender(mailProvider: MailProvider, email: string): Promise<void> {
@@ -146,14 +147,34 @@ export async function blockSender(mailProvider: MailProvider, email: string): Pr
 // "Move to..." reclassifies an already-approved sender's bucket going
 // forward, and re-labels every thread of theirs currently sitting under
 // their OLD bucket's label (not just the one thread being viewed).
+//
+// For a sender still held in the Gatekeeper, moving IS approving: it decides
+// them into the target bucket and releases their held threads there. This is
+// what powers the same "Move to" controls inside a Gatekeeper thread view —
+// no need to bounce back to the Gatekeeper list first.
 export async function moveSenderToBucket(
   mailProvider: MailProvider,
   email: string,
   newBucket: ApprovalBucket,
 ): Promise<{ movedThreadIds: string[] }> {
   const approval = getSenderApproval(email);
-  if (!approval || approval.status !== 'approved') {
-    throw new Error(`${email} is not an approved sender; approve them in the Gatekeeper first`);
+  if (approval?.status === 'blocked') {
+    throw new Error(`${email} is blocked; unblock them first if you want their mail`);
+  }
+  if (!approval) {
+    // Sender never went through the gate (e.g. mail predating yo). Seed a
+    // row so decideSender's UPDATE has something to land on.
+    insertPendingSender({
+      senderEmail: email,
+      senderDomain: email.split('@')[1] ?? '',
+      displayName: null,
+      firstSnippet: '',
+      firstThreadId: '',
+    });
+  }
+  if (!approval || approval.status === 'pending') {
+    const movedThreadIds = await approveSender(mailProvider, email, newBucket);
+    return { movedThreadIds };
   }
 
   const oldBucket = approval.bucket;

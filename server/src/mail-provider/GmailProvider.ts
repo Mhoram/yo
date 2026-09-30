@@ -341,7 +341,11 @@ export class GmailProvider implements MailProvider {
   async listLabels(): Promise<MailLabel[]> {
     recordCall('labels.list');
     const res = await this.gmail.users.labels.list({ userId: 'me' });
-    return (res.data.labels ?? []).map((l) => ({ id: l.id ?? '', name: l.name ?? '' }));
+    return (res.data.labels ?? []).map((l) => ({
+      id: l.id ?? '',
+      name: l.name ?? '',
+      messagesUnread: l.messagesUnread ?? undefined,
+    }));
   }
 
   async createLabel(name: string): Promise<MailLabel> {

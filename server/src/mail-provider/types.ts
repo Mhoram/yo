@@ -1,6 +1,9 @@
 export interface MailLabel {
   id: string;
   name: string;
+  // Unread counters from Gmail's label objects (present on labels.list;
+  // powers the unread badges in the box switcher).
+  messagesUnread?: number;
 }
 
 export interface MailAddress {

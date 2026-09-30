@@ -14,6 +14,8 @@ import {
 import { EmailBodyFrame } from '../components/EmailBodyFrame';
 import { RichTextEditor } from '../components/RichTextEditor';
 import { AttachmentPicker, attachmentsToPayload, type PendingAttachment } from '../components/AttachmentPicker';
+import { AttachmentViewer, type ViewingAttachment } from '../components/AttachmentViewer';
+import { usePendingSenders, useGatekeeperDecision } from '../hooks/useGatekeeper';
 import { formatDateTime } from '../lib/format';
 import type { ApprovalBucket } from '../lib/api';
 
@@ -143,6 +145,7 @@ function ComposeBox({ threadId }: { threadId: string }) {
 export function ThreadView() {
   const { id } = useParams<{ id: string }>();
   const { data, isLoading, error } = useThread(id);
+  const [viewing, setViewing] = useState<ViewingAttachment | null>(null);
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const moveSender = useMoveSenderBucket();
@@ -182,6 +185,14 @@ export function ThreadView() {
 
   const senderEmail = data.messages.at(-1)?.from.email;
 
+  // A sender still held by the Gatekeeper gets different thread-view
+  // actions: "Move to" doubles as approving them into that bucket (the
+  // server treats moving a pending sender as a decision), and they can be
+  // blocked straight from here instead of trekking back to the list.
+  const { data: pendingSenders } = usePendingSenders();
+  const isPendingSender = Boolean(senderEmail && pendingSenders?.senders.some((s) => s.email === senderEmail));
+  const decision = useGatekeeperDecision();
+
   return (
     <div className="mx-auto max-w-5xl px-2 py-10 sm:px-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -220,18 +231,28 @@ export function ThreadView() {
         </div>
         {senderEmail && (
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm text-muted-foreground">Move to:</span>
+            <span className="text-sm text-muted-foreground">{isPendingSender ? 'Approve into:' : 'Move to:'}</span>
             {BUCKET_OPTIONS.map(({ bucket, label }) => (
               <button
                 key={bucket}
                 type="button"
-                disabled={moveSender.isPending}
+                disabled={moveSender.isPending || decision.isPending}
                 onClick={() => moveSender.mutate({ email: senderEmail, bucket })}
                 className="rounded-full border border-border px-3 py-1 text-sm font-semibold text-muted-foreground hover:bg-muted disabled:opacity-50"
               >
                 {label}
               </button>
             ))}
+            {isPendingSender && (
+              <button
+                type="button"
+                disabled={moveSender.isPending || decision.isPending}
+                onClick={() => decision.mutate({ email: senderEmail, action: 'block' })}
+                className="rounded-full border border-border px-3 py-1 text-sm font-semibold text-muted-foreground hover:bg-muted disabled:opacity-50"
+              >
+                Block
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -272,27 +293,25 @@ export function ThreadView() {
                     const isImage = a.mimeType.startsWith('image/');
                     return (
                       <li key={a.attachmentId}>
-                        {isImage ? (
-                          <a
-                            href={url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="block w-28 overflow-hidden rounded-md border border-border hover:opacity-90"
-                          >
-                            <img src={url} alt={a.filename} className="h-28 w-28 object-cover" />
-                            <span className="block truncate bg-card px-2 py-1 text-xs text-muted-foreground">
+                        <button
+                          type="button"
+                          onClick={() => setViewing({ url, filename: a.filename, mimeType: a.mimeType, size: a.size })}
+                          className="group block overflow-hidden rounded-md border border-border text-left hover:opacity-90"
+                        >
+                          {isImage ? (
+                            <>
+                              <img src={url} alt={a.filename} className="h-28 w-28 object-cover" />
+                              <span className="block truncate bg-card px-2 py-1 text-xs text-muted-foreground">
+                                {a.filename}
+                              </span>
+                            </>
+                          ) : (
+                            <span className="inline-flex items-center gap-2 px-3 py-1.5 text-sm text-foreground">
                               {a.filename}
+                              <span className="text-muted-foreground">({Math.ceil(a.size / 1024)} KB)</span>
                             </span>
-                          </a>
-                        ) : (
-                          <a
-                            href={url}
-                            className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-1.5 text-sm text-foreground hover:bg-muted"
-                          >
-                            {a.filename}
-                            <span className="text-muted-foreground">({Math.ceil(a.size / 1024)} KB)</span>
-                          </a>
-                        )}
+                          )}
+                        </button>
                       </li>
                     );
                   })}
@@ -303,6 +322,7 @@ export function ThreadView() {
         ))}
       </div>
       <ComposeBox threadId={data.id} />
+      {viewing && <AttachmentViewer attachment={viewing} onClose={() => setViewing(null)} />}
     </div>
   );
 }
