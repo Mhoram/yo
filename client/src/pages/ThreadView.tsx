@@ -152,6 +152,11 @@ export function ThreadView() {
   const archiveThread = useArchiveThread();
   const trashThread = useTrashThread();
   const markUnread = useMarkThreadUnread();
+  // Hooks stay above the early returns below (Rules of Hooks): these run
+  // unconditionally, and the values they produce are only READ after the
+  // thread data has loaded.
+  const { data: pendingSenders } = usePendingSenders();
+  const decision = useGatekeeperDecision();
 
   // Opening a thread marks it read server-side (see GET /api/threads/:id).
   // Patch that directly into the already-cached list data instead of
@@ -189,9 +194,7 @@ export function ThreadView() {
   // actions: "Move to" doubles as approving them into that bucket (the
   // server treats moving a pending sender as a decision), and they can be
   // blocked straight from here instead of trekking back to the list.
-  const { data: pendingSenders } = usePendingSenders();
   const isPendingSender = Boolean(senderEmail && pendingSenders?.senders.some((s) => s.email === senderEmail));
-  const decision = useGatekeeperDecision();
 
   return (
     <div className="mx-auto max-w-5xl px-2 py-10 sm:px-6">
