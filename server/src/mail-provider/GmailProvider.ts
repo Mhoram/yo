@@ -181,6 +181,7 @@ export class GmailProvider implements MailProvider {
   async getAttachment(
     messageId: string,
     attachmentId: string,
+    opts?: { partIndex?: number },
   ): Promise<{ data: Buffer; mimeType: string; filename: string }> {
     // Gmail's attachments.get only returns raw bytes; filename/mimeType
     // live on the message's part metadata, so a full message fetch is
@@ -188,7 +189,13 @@ export class GmailProvider implements MailProvider {
     recordCall('messages.get');
     const msgRes = await this.gmail.users.messages.get({ userId: 'me', id: messageId, format: 'full' });
     const { message } = parseGmailMessage(msgRes.data);
-    const meta = message.attachments.find((a) => a.attachmentId === attachmentId);
+    // Gmail rotates attachment IDs on every messages.get, so a cached ID
+    // never matches the fresh fetch. The attachments array is in stable
+    // structural walk order, so partIndex is the reliable address; the ID
+    // match is kept as a fallback for callers that don't pass an index.
+    const meta =
+      (opts?.partIndex != null ? message.attachments[opts.partIndex] : undefined) ??
+      message.attachments.find((a) => a.attachmentId === attachmentId);
 
     recordCall('messages.attachments.get');
     const attRes = await this.gmail.users.messages.attachments.get({ userId: 'me', messageId, id: attachmentId });
@@ -341,7 +348,11 @@ export class GmailProvider implements MailProvider {
   async listLabels(): Promise<MailLabel[]> {
     recordCall('labels.list');
     const res = await this.gmail.users.labels.list({ userId: 'me' });
-    return (res.data.labels ?? []).map((l) => ({ id: l.id ?? '', name: l.name ?? '' }));
+    return (res.data.labels ?? []).map((l) => ({
+      id: l.id ?? '',
+      name: l.name ?? '',
+      messagesUnread: l.messagesUnread ?? undefined,
+    }));
   }
 
   async createLabel(name: string): Promise<MailLabel> {

@@ -23,9 +23,15 @@ export interface MailProvider {
 
   getMessage(messageId: string): Promise<MailMessage>;
 
+  // attachmentId comes from a cached thread fetch. Gmail rotates attachment
+  // IDs on every messages.get (encrypted-ID era), so the ID is only good for
+  // fetching bytes — to get the part's REAL metadata, pass partIndex, the
+  // attachment's position in the parsed message.attachments array (stable:
+  // the walk is structural), and the provider re-resolves it server-side.
   getAttachment(
     messageId: string,
     attachmentId: string,
+    opts?: { partIndex?: number },
   ): Promise<{ data: Buffer; mimeType: string; filename: string }>;
 
   // Distinct addresses from mail headers (sent + received), for seeding the
