@@ -184,6 +184,25 @@ describe('moveSenderToBucket', () => {
     expect(getSenderApproval(email)?.bucket).toBe('receipts');
   });
 
+  it('re-files ARCHIVED threads too — they carry no location label', async () => {
+    // Regression: the old search scoped to the old location's label
+    // (label:inbox), but archived threads have NO location label (archive
+    // strips INBOX + bucket labels), so they were silently never found and
+    // moves reported "already there" while nothing moved.
+    const provider = new FakeMailProvider();
+    const email = freshSender();
+    provider.addThread({ id: 't1', from: email }); // will stay in INBOX
+    provider.addThread({ id: 't2', from: email, labelIds: [] }); // archived
+    await gateThreadBySender(provider, { id: 't1', snippet: '' }, { email });
+    await approveSender(provider, email, 'yobox');
+
+    const result = await moveSenderToBucket(provider, email, 'feed');
+
+    expect(result.movedThreadIds).toEqual(expect.arrayContaining(['t1', 't2']));
+    expect(provider.threadLabels('t2')).toContain(provider.labelIdFor('App/Feed'));
+    expect(getSenderApproval(email)?.bucket).toBe('feed');
+  });
+
   it('moves between two non-yobox buckets without touching INBOX', async () => {
     const provider = new FakeMailProvider();
     const email = freshSender();

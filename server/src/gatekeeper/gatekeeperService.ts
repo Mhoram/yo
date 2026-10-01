@@ -84,10 +84,12 @@ export async function gateThreadBySender(
 async function findThreadsByLabelAndSender(
   mailProvider: MailProvider,
   email: string,
-  labelName: string,
+  // null = no location constraint: matches archived threads too. Gmail's
+  // search still excludes trash/spam, so this can't resurrect deleted mail.
+  labelName: string | null,
 ): Promise<string[]> {
   const { threadIds } = await mailProvider.listThreadIds({
-    q: `from:${email} label:${labelName}`,
+    q: labelName ? `from:${email} label:${labelName}` : `from:${email}`,
     maxResults: 100,
   });
   return threadIds;
@@ -95,12 +97,6 @@ async function findThreadsByLabelAndSender(
 
 async function findHeldThreadIds(mailProvider: MailProvider, email: string): Promise<string[]> {
   return findThreadsByLabelAndSender(mailProvider, email, GATEKEEPER_PENDING_LABEL);
-}
-
-// The Gmail search name for whatever a sender's current bucket is, used to
-// find their already-labeled threads. `null`/'yobox' means plain INBOX.
-function bucketSearchLabel(bucket: string | null): string {
-  return (bucket && BUCKET_LABELS[bucket]) || 'inbox';
 }
 
 // The real Gmail label ID for a bucket. INBOX is a system label (id ===
@@ -145,8 +141,11 @@ export async function blockSender(mailProvider: MailProvider, email: string): Pr
 }
 
 // "Move to..." reclassifies an already-approved sender's bucket going
-// forward, and re-labels every thread of theirs currently sitting under
-// their OLD bucket's label (not just the one thread being viewed).
+// forward, and re-files ALL of the sender's non-trash/spam threads into
+// the new bucket (not just the one being viewed). The search deliberately
+// has NO location label: threads that were archived carry no location
+// label at all, and a label-scoped search silently missed them — reporting
+// "already there" while nothing moved.
 //
 // For a sender still held in the Gatekeeper, moving IS approving: it decides
 // them into the target bucket and releases their held threads there. This is
@@ -183,8 +182,7 @@ export async function moveSenderToBucket(
     return { movedThreadIds: [] };
   }
 
-  const oldSearchLabel = bucketSearchLabel(oldBucket);
-  const threadIds = await findThreadsByLabelAndSender(mailProvider, email, oldSearchLabel);
+  const threadIds = await findThreadsByLabelAndSender(mailProvider, email, null);
 
   const [oldLabelId, newLabelId] = await Promise.all([
     bucketLabelId(mailProvider, oldBucket),
