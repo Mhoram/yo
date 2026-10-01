@@ -5,6 +5,7 @@ build/
 deploy/backup.env
 PLAN.md
 TODO.md
+docs/go-public.md
 server/data/*.db
 server/data/*.db-*
 *.log

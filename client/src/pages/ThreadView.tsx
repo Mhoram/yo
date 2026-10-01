@@ -262,10 +262,10 @@ export function ThreadView() {
       {moveSender.isSuccess && moveSender.variables?.email === senderEmail && (
         <p className="mt-2 text-sm text-muted-foreground">
           {moveSender.data.movedThreadIds.length > 0
-            ? `Moved ${moveSender.data.movedThreadIds.length} thread(s) to ${
+            ? `Moved ${moveSender.data.movedThreadIds.length} conversation(s) to ${
                 BUCKET_OPTIONS.find((o) => o.bucket === moveSender.variables?.bucket)?.label
               }.`
-            : 'Already there.'}
+            : 'Decision updated, but no conversations were re-filed.'}
         </p>
       )}
       {moveSender.isError && <p className="mt-2 text-sm text-red-400">{moveSender.error.message}</p>}
