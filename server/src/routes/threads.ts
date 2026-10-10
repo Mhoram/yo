@@ -9,6 +9,7 @@ import { buildForwardEnvelope } from '../lib/forwardEnvelope.js';
 import { parseAttachments } from '../lib/attachments.js';
 import { buildThreadSummary } from '../lib/threadSummary.js';
 import { recordOutgoingRecipients } from '../db/knownContacts.js';
+import { readThreadListPage, writeThreadListPage } from '../db/threadListCache.js';
 
 export function threadsRouter(mailProvider: MailProvider): Router {
   const router = Router();
@@ -23,6 +24,28 @@ export function threadsRouter(mailProvider: MailProvider): Router {
       // their display name, to filter threads.list.
       const bucketLabelName = BUCKET_LABELS[requestedLabel];
       const label = bucketLabelName ? await ensureLabel(mailProvider, bucketLabelName) : requestedLabel;
+
+      // First-page fast path: serve the cached page while Gmail's
+      // historyId hasn't moved since it was fetched (every label/message
+      // change anywhere moves it, so a match means the page is exact).
+      // One getProfile call replaces ~15 threads.get calls (~600 quota
+      // units and ~1s) on repeat loads. historyId is captured before any
+      // live fetch so a mid-fetch change can only cause a wasted cache
+      // entry, never a stale serve.
+      const isFirstPage = pageToken === undefined;
+      let historyId: string | undefined;
+      if (isFirstPage) {
+        try {
+          historyId = await mailProvider.getCurrentHistoryId();
+          const cached = readThreadListPage(label);
+          if (cached && cached.historyId === historyId) {
+            res.json({ threads: cached.summaries, nextPageToken: cached.nextPageToken });
+            return;
+          }
+        } catch (cacheErr) {
+          console.warn('Thread list cache check failed, falling back to live fetch', cacheErr);
+        }
+      }
 
       // Gatekeeper/bucket gating means a whole page of INBOX threads can come
       // back entirely filtered out (e.g. right after a bulk import of
@@ -62,6 +85,7 @@ export function threadsRouter(mailProvider: MailProvider): Router {
               mailProvider,
               { id: thread.id, snippet: last.snippet || thread.snippet },
               last.from,
+              { deferFiling: true },
             );
             const isYobox = gate.bucket === null || gate.bucket === 'yobox';
             return gate.status === 'approved' && isYobox ? thread : null;
@@ -76,6 +100,14 @@ export function threadsRouter(mailProvider: MailProvider): Router {
       }
 
       const summaries = visibleThreads.map(buildThreadSummary);
+
+      if (isFirstPage && historyId) {
+        try {
+          writeThreadListPage(label, historyId, nextPageToken, summaries);
+        } catch (cacheErr) {
+          console.warn('Thread list cache write failed', cacheErr);
+        }
+      }
 
       res.json({ threads: summaries, nextPageToken });
     } catch (err) {

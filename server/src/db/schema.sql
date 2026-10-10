@@ -40,6 +40,19 @@ CREATE TABLE IF NOT EXISTS known_contacts (
   last_used_at TEXT NOT NULL
 );
 
+-- Read-through cache of the first page of each box's thread list (the
+-- built summaries, in order). A row is only served while Gmail's
+-- historyId still matches: every mutation we or anyone else makes moves
+-- the historyId, so staleness is impossible, just conservative (any
+-- unrelated change anywhere in the mailbox also invalidates).
+CREATE TABLE IF NOT EXISTS thread_list_pages (
+  label TEXT PRIMARY KEY,
+  history_id TEXT NOT NULL,
+  next_page_token TEXT,
+  summaries_json TEXT NOT NULL,
+  fetched_at TEXT NOT NULL
+);
+
 -- One-row state for the contacts backfill (the only part of the contacts
 -- feature that costs Gmail quota). Runs at most once per day; the page_token
 -- column (added by migration, keeping schema.sql at the table's original

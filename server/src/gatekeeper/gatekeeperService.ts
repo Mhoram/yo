@@ -31,6 +31,41 @@ export interface GateResult {
   bucket: string | null;
 }
 
+export interface GateOptions {
+  // List views pass this: a gated thread is excluded from the response
+  // purely from the local decision, so the Gmail label move that files it
+  // away can happen after the response is sent instead of adding a
+  // threads.modify round-trip per gated thread to page load (measured at
+  // ~1.2s on a page with five threads to file). Default stays synchronous
+  // for callers (and tests) that need the filing to have happened.
+  deferFiling?: boolean;
+}
+
+// Threads currently being filed by a deferred label move. Dedupes the
+// modify itself and, for pending senders, guards held_count against a
+// reload that re-sees the thread in INBOX before the move lands.
+const filingInFlight = new Map<string, Promise<void>>();
+
+async function fileThreadNow(mailProvider: MailProvider, threadId: string, labelName: string): Promise<void> {
+  const labelId = await ensureLabel(mailProvider, labelName);
+  await mailProvider.modifyThreadLabels(threadId, { remove: ['INBOX'], add: [labelId] });
+}
+
+function fileThread(mailProvider: MailProvider, threadId: string, labelName: string, defer: boolean): Promise<void> | void {
+  if (!defer) return fileThreadNow(mailProvider, threadId, labelName);
+  if (filingInFlight.has(threadId)) return;
+  const promise = fileThreadNow(mailProvider, threadId, labelName)
+    .catch((err) => console.error(`Deferred label filing failed for thread ${threadId}`, err))
+    .finally(() => filingInFlight.delete(threadId));
+  filingInFlight.set(threadId, promise);
+}
+
+// Test-only: lets tests await fire-and-forget deferred filing before
+// asserting on label state. Not used by app code.
+export function __flushDeferredFilingForTests(): Promise<void[]> {
+  return Promise.all(Array.from(filingInFlight.values()));
+}
+
 // Called for every thread in the Yobox (INBOX) listing. New senders are
 // inserted as pending and their thread pulled out of the inbox into the
 // Gatekeeper queue; already-decided senders pass straight through (approved)
@@ -41,6 +76,7 @@ export async function gateThreadBySender(
   mailProvider: MailProvider,
   thread: { id: string; snippet: string },
   sender: { email: string; name?: string },
+  opts?: GateOptions,
 ): Promise<GateResult> {
   const email = sender.email.toLowerCase();
   const domain = email.split('@')[1] ?? '';
@@ -63,21 +99,20 @@ export async function gateThreadBySender(
     const bucket = approval.bucket;
     const bucketLabelName = bucket ? BUCKET_LABELS[bucket] : undefined;
     if (bucketLabelName) {
-      const labelId = await ensureLabel(mailProvider, bucketLabelName);
-      await mailProvider.modifyThreadLabels(thread.id, { remove: ['INBOX'], add: [labelId] });
+      await fileThread(mailProvider, thread.id, bucketLabelName, opts?.deferFiling ?? false);
     }
     return { status: 'approved', bucket };
   }
 
   if (approval?.status === 'blocked') {
-    const labelId = await ensureLabel(mailProvider, GATEKEEPER_BLOCKED_LABEL);
-    await mailProvider.modifyThreadLabels(thread.id, { remove: ['INBOX'], add: [labelId] });
+    await fileThread(mailProvider, thread.id, GATEKEEPER_BLOCKED_LABEL, opts?.deferFiling ?? false);
     return { status: 'blocked', bucket: null };
   }
 
-  incrementHeldCount(email);
-  const labelId = await ensureLabel(mailProvider, GATEKEEPER_PENDING_LABEL);
-  await mailProvider.modifyThreadLabels(thread.id, { remove: ['INBOX'], add: [labelId] });
+  // A reload can re-see the thread while its deferred filing is still in
+  // flight; don't count it held a second time.
+  if (!filingInFlight.has(thread.id)) incrementHeldCount(email);
+  await fileThread(mailProvider, thread.id, GATEKEEPER_PENDING_LABEL, opts?.deferFiling ?? false);
   return { status: 'pending', bucket: null };
 }
 
