@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Nightly backup of the SQLite database (PLAN.md §6a).
+# Nightly backup of the SQLite database.
 #
 # Takes a consistent snapshot of the live DB using better-sqlite3's .backup()
 # API, NOT a raw `cp` (unsafe on a live WAL-mode database). It verifies
@@ -10,8 +10,8 @@
 # running container, which already has better-sqlite3 installed. The snapshot
 # is written into the mounted data volume so the host can pick it up.
 #
-# Offsite target: AWS S3 (preferred, per the plan) or any rclone remote
-# (e.g. Backblaze B2) if avoiding AWS. The bucket/remote should have
+# Offsite target: AWS S3 (preferred) or any rclone remote (e.g. Backblaze
+# B2) if avoiding AWS. The bucket/remote should have
 # versioning enabled. That gives point-in-time history with no extra
 # retention logic here.
 #
