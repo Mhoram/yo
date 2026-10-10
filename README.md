@@ -29,7 +29,7 @@ What works today:
 - Nightly database backup to S3 or any rclone remote, see `deploy/backup-db.sh` and [`deploy/self-host.md`](./deploy/self-host.md) §8
 - Automatic Gemini code review on pull requests
 
-Not done yet (see [`ROADMAP.md`](./ROADMAP.md)): push notifications, bucket suggestions when approving a sender, light mode.
+Not done yet (see [`ROADMAP.md`](./ROADMAP.md)): push notifications and bucket suggestions when approving a sender.
 
 ## Quick start
 
@@ -122,6 +122,19 @@ Run from `server/` with `npx tsx scripts/<name>`. These were written for specifi
 - `migrate-gmail-labels.mjs`: moves threads off the pre-rename labels (`App/Screener-*`, `App/Paper-Trail`) onto the current ones (`App/Gatekeeper-*`, `App/Receipts`), then deletes the old labels. Only needed if you ran an older build. Safe to re-run.
 - `backfill-pending-thread-ids.ts`: finds one held thread per pending sender for rows created before thread-linking existed in the Gatekeeper UI.
 - `diagnose-inbox.ts [sampleSize]`: read-only diagnostic. Samples the top N Gmail INBOX threads and tallies how each sender would resolve (pending / approved-yobox / other bucket / blocked / not in DB) without changing any labels. Useful for "why is Yobox empty" questions.
+
+## Development
+
+```bash
+npm run dev     # server (port 3001) + client (port 5173) with hot reload
+npm test        # server and client suites; SQLite runs in memory, real data is never touched
+```
+
+CI runs the test suite and an automatic Gemini code review on every pull request — PR diffs are sent to Google's Gemini API for that review.
+
+## Security
+
+Found a vulnerability? Please don't open a public issue — see [SECURITY.md](./SECURITY.md) for how to report it privately.
 
 ## Known quirks
 
