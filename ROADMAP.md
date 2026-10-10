@@ -10,11 +10,7 @@ A nudge when new senders land in the Gatekeeper, or when approved mail arrives i
 
 When a new sender is held, suggest Yobox, Receipts, or Feed based on their held mail: subject-line patterns, list headers, how similar senders were sorted. Approval stays a manual click; the suggestion just pre-fills the choice.
 
-## Light mode
-
-The theme is dark-only right now (a synthwave palette defined in `client/src/styles/theme.css`). A light variant would live next to it behind a media query or a toggle.
-
-## Backup retention check
+## Backup restore drill (recurring)
 
 Nightly backups (03:17 cron) and the offsite S3 bucket are live, and the
 restore path was drill-tested end to end. The drill should be repeated every
