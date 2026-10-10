@@ -351,7 +351,6 @@ export class GmailProvider implements MailProvider {
     return (res.data.labels ?? []).map((l) => ({
       id: l.id ?? '',
       name: l.name ?? '',
-      messagesUnread: l.messagesUnread ?? undefined,
     }));
   }
 

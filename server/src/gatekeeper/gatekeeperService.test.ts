@@ -6,6 +6,7 @@ import { getSenderApproval } from '../db/senderApprovals.js';
 import {
   approveSender,
   blockSender,
+  __flushDeferredFilingForTests,
   gateThreadBySender,
   listBlockedSenders,
   moveSenderToBucket,
@@ -265,5 +266,53 @@ describe('moveSenderToBucket', () => {
     await blockSender(provider, email);
 
     await expect(moveSenderToBucket(provider, email, 'feed')).rejects.toThrow(/blocked/);
+  });
+});
+
+describe('gateThreadBySender with deferFiling', () => {
+  it('returns the decision immediately and files labels in the background', async () => {
+    const provider = new FakeMailProvider();
+    const email = freshSender();
+    provider.addThread({ id: 't1', from: email, snippet: 'hello' });
+
+    const result = await gateThreadBySender(provider, { id: 't1', snippet: 'hello' }, { email }, { deferFiling: true });
+
+    // Decision is available synchronously; the label move may not have
+    // landed yet.
+    expect(result.status).toBe('pending');
+    await __flushDeferredFilingForTests();
+    const labels = provider.threadLabels('t1');
+    expect(labels).not.toContain('INBOX');
+    expect(labels).toContain(provider.labelIdFor(GATEKEEPER_PENDING_LABEL));
+    expect(getSenderApproval(email)?.held_count).toBe(1);
+  });
+
+  it('does not double-count held_count when a reload re-sees a thread mid-filing', async () => {
+    const provider = new FakeMailProvider();
+    const email = freshSender();
+    provider.addThread({ id: 't1', from: email });
+
+    // Never-resolving modify keeps the filing in flight, simulating a
+    // second sighting (reload) before the first label move has landed.
+    const original = provider.modifyThreadLabels.bind(provider);
+    let release: () => void = () => {};
+    let signalStarted: () => void = () => {};
+    const started = new Promise<void>((resolve) => { signalStarted = resolve; });
+    provider.modifyThreadLabels = (threadId: string, opts: { add?: string[]; remove?: string[] }) => {
+      signalStarted();
+      return new Promise<void>((resolve) => {
+        release = () => resolve(original(threadId, opts));
+      });
+    };
+
+    await gateThreadBySender(provider, { id: 't1', snippet: '' }, { email }, { deferFiling: true });
+    await started; // the deferred filing has reached its modify call
+    await gateThreadBySender(provider, { id: 't1', snippet: '' }, { email }, { deferFiling: true });
+
+    expect(getSenderApproval(email)?.held_count).toBe(1);
+
+    release();
+    await __flushDeferredFilingForTests();
+    expect(provider.threadLabels('t1')).not.toContain('INBOX');
   });
 });

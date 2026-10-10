@@ -71,6 +71,7 @@ export interface KnownContact {
 export interface MailBox {
   key: 'yobox' | 'receipts' | 'feed';
   unread: number;
+  unreadCapped: boolean;
 }
 
 export interface OutgoingAttachment {

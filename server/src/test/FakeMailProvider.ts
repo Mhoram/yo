@@ -59,6 +59,9 @@ export class FakeMailProvider implements MailProvider {
     }
 
     if (query.q) {
+      if (/\bis:unread\b/.test(query.q)) {
+        results = results.filter((t) => t.labelIds.has('UNREAD'));
+      }
       const fromMatch = query.q.match(/from:(\S+)/);
       const labelMatch = query.q.match(/label:(\S+)/);
       if (fromMatch) {
