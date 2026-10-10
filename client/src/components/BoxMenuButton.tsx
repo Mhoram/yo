@@ -17,7 +17,13 @@ export function BoxMenuButton() {
   const { data } = usePendingSenders();
   const pendingCount = data?.senders.length ?? 0;
   const boxes = useBoxes().data;
-  const unread = (key: 'yobox' | 'receipts' | 'feed') => boxes?.find((b) => b.key === key)?.unread ?? 0;
+  // e.g. "Yobox (3)", or "Feed (99+)" when the week's unread runs past
+  // the server's cap.
+  const unreadLabel = (key: 'yobox' | 'receipts' | 'feed') => {
+    const box = boxes?.find((b) => b.key === key);
+    if (!box || box.unread === 0) return '';
+    return ` (${box.unread}${box.unreadCapped ? '+' : ''})`;
+  };
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -56,13 +62,13 @@ export function BoxMenuButton() {
           <div className="fixed inset-0 z-20 bg-black/40 sm:hidden" onClick={close} />
           <div className="fixed inset-x-4 bottom-[84px] z-20 mx-auto w-auto max-w-xs rounded-xl border border-border bg-card p-1.5 shadow-lg sm:absolute sm:inset-x-auto sm:bottom-auto sm:left-0 sm:top-full sm:mt-2 sm:w-48 sm:max-w-none">
             <NavLink to="/" end className={menuLinkClass} onClick={close}>
-              Yobox{unread('yobox') > 0 && ` (${unread('yobox')})`}
+              Yobox{unreadLabel('yobox')}
             </NavLink>
             <NavLink to="/receipts" className={menuLinkClass} onClick={close}>
-              Receipts{unread('receipts') > 0 && ` (${unread('receipts')})`}
+              Receipts{unreadLabel('receipts')}
             </NavLink>
             <NavLink to="/feed" className={menuLinkClass} onClick={close}>
-              Feed{unread('feed') > 0 && ` (${unread('feed')})`}
+              Feed{unreadLabel('feed')}
             </NavLink>
             <NavLink to="/sent" className={menuLinkClass} onClick={close}>
               Sent
