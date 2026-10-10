@@ -1,6 +1,6 @@
-# Multi-stage build for the self-hosted deploy shape described in PLAN.md
-# §6a — a single container running the Node backend, which also serves the
-# already-built client (see server/src/index.ts's NODE_ENV=production block).
+# Multi-stage build for the self-hosted deploy shape: a single container
+# running the Node backend, which also serves the already-built client
+# (see server/src/index.ts's NODE_ENV=production block).
 #
 # Both stages use the same base image/tag so better-sqlite3's native binding,
 # compiled in the build stage, is guaranteed to match the runtime stage's
