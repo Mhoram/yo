@@ -97,7 +97,7 @@ docker compose exec -T "$YO_SERVICE" node -e '
       .then(() => db.close())
       .catch((err) => { console.error(err); process.exit(1); });
   } catch (err) { console.error(err); process.exit(1); }
-' "/app/server/data/$YO_DB_FILENAME" "$YO_DB_FILENAME.backup-$STAMP"
+' "/app/server/data/$YO_DB_FILENAME" "/app/server/data/$YO_DB_FILENAME.backup-$STAMP"
 
 mv "$SNAPSHOT_HOST_PATH" "$BACKUP_DIR/$YO_DB_FILENAME.backup-$STAMP"
 SNAPSHOT_HOST_PATH="$BACKUP_DIR/$YO_DB_FILENAME.backup-$STAMP"
