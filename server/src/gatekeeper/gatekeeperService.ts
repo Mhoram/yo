@@ -175,21 +175,11 @@ export async function approveSender(
 // threads the old pending-only search did, so the Gatekeeper flow is
 // unchanged.
 export async function blockSender(mailProvider: MailProvider, email: string): Promise<void> {
-  const approval = getSenderApproval(email);
-  if (!approval) {
-    // Sender never went through the gate (e.g. mail predating yo). Seed a
-    // row so decideSender's UPDATE has something to land on.
-    insertPendingSender({
-      senderEmail: email,
-      senderDomain: email.split('@')[1] ?? '',
-      displayName: null,
-      firstSnippet: '',
-      firstThreadId: '',
-    });
-  }
   // Capture the old bucket before decideSender clears it: approved
   // senders' threads carry that bucket label and it must come off.
-  const oldBucket = approval?.bucket ?? null;
+  // decideSender upserts, so a sender that never went through the gate
+  // (e.g. mail predating yo) still gets their blocked decision recorded.
+  const oldBucket = getSenderApproval(email)?.bucket ?? null;
   decideSender(email, 'blocked');
 
   const blockedLabelId = await ensureLabel(mailProvider, GATEKEEPER_BLOCKED_LABEL);
@@ -225,17 +215,8 @@ export async function moveSenderToBucket(
   if (approval?.status === 'blocked') {
     throw new Error(`${email} is blocked; unblock them first if you want their mail`);
   }
-  if (!approval) {
-    // Sender never went through the gate (e.g. mail predating yo). Seed a
-    // row so decideSender's UPDATE has something to land on.
-    insertPendingSender({
-      senderEmail: email,
-      senderDomain: email.split('@')[1] ?? '',
-      displayName: null,
-      firstSnippet: '',
-      firstThreadId: '',
-    });
-  }
+  // An unknown sender (never gated, e.g. mail predating yo) is fine:
+  // approveSender's decideSender call upserts their row into existence.
   if (!approval || approval.status === 'pending') {
     const movedThreadIds = await approveSender(mailProvider, email, newBucket);
     return { movedThreadIds };

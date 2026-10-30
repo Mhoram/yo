@@ -54,13 +54,28 @@ export function incrementHeldCount(email: string): void {
   db.prepare('UPDATE sender_approvals SET held_count = held_count + 1 WHERE sender_email = ?').run(email);
 }
 
+// Atomically create or update the sender's decision: senders that already
+// have a row (the normal case — every gated sender gets one as pending)
+// get their status/decided_at/bucket updated; a sender that somehow never
+// went through the gate (e.g. mail predating yo, screen-out from a thread
+// view) gets a fresh row. Never touches the sender's identity/profile
+// fields on conflict.
 export function decideSender(email: string, status: 'approved' | 'blocked', bucket: string | null = null): void {
-  db.prepare('UPDATE sender_approvals SET status = ?, decided_at = ?, bucket = ? WHERE sender_email = ?').run(
-    status,
-    new Date().toISOString(),
-    bucket,
+  const now = new Date().toISOString();
+  db.prepare(
+    `INSERT INTO sender_approvals (sender_email, sender_domain, status, first_seen_at, decided_at, bucket)
+     VALUES (@email, @domain, @status, @now, @now, @bucket)
+     ON CONFLICT(sender_email) DO UPDATE SET
+       status = @status,
+       decided_at = @now,
+       bucket = @bucket`,
+  ).run({
     email,
-  );
+    domain: email.split('@')[1] ?? '',
+    status,
+    now,
+    bucket,
+  });
 }
 
 export function listPendingSenders(): SenderApproval[] {
