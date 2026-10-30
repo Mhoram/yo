@@ -18,7 +18,7 @@ What works today:
 - Recipient autocomplete in To/Cc/Bcc, built from your own sent and received mail plus approved senders (local cache, no quota cost while typing)
 - Search
 - Sent view, built on Gmail's `SENT` label but shown from the recipient's point of view
-- "Move to..." to change an approved sender's bucket from a thread view
+- "Move to..." to change an approved sender's bucket from a thread view, or screen them out entirely
 - Sender logos via BIMI (the DNS-based brand logo system Gmail and Yahoo already use), with initials as fallback
 - PWA install (manifest, icons, service worker). No offline support yet.
 - Mobile layout: a popup box switcher that sits at the bottom of the screen on phones, condensed thread rows, a nav bar notice when senders are waiting on a Gatekeeper decision

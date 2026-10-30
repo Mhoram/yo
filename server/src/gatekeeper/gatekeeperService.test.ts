@@ -155,6 +155,34 @@ describe('blockSender', () => {
     expect(getSenderApproval(email)?.status).toBe('blocked');
   });
 
+  it('screens out an APPROVED sender, sweeping inbox and archived threads into blocked', async () => {
+    const provider = new FakeMailProvider();
+    const email = freshSender();
+    provider.addThread({ id: 't1', from: email }); // in INBOX
+    provider.addThread({ id: 't2', from: email, labelIds: [] }); // archived
+    await gateThreadBySender(provider, { id: 't1', snippet: '' }, { email });
+    await approveSender(provider, email, 'receipts');
+
+    await blockSender(provider, email);
+
+    for (const id of ['t1', 't2']) {
+      const labels = provider.threadLabels(id);
+      expect(labels).toContain(provider.labelIdFor(GATEKEEPER_BLOCKED_LABEL));
+      expect(labels).not.toContain('INBOX');
+      expect(labels).not.toContain(provider.labelIdFor('App/Receipts'));
+    }
+    expect(getSenderApproval(email)?.status).toBe('blocked');
+  });
+
+  it('blocking an unknown sender (never gated) still records the decision', async () => {
+    const provider = new FakeMailProvider();
+    const email = freshSender();
+
+    await blockSender(provider, email);
+
+    expect(getSenderApproval(email)?.status).toBe('blocked');
+  });
+
   it('surfaces the sender in listBlockedSenders', async () => {
     const provider = new FakeMailProvider();
     const email = freshSender();
