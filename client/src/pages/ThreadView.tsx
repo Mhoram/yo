@@ -192,8 +192,10 @@ export function ThreadView() {
 
   // A sender still held by the Gatekeeper gets different thread-view
   // actions: "Move to" doubles as approving them into that bucket (the
-  // server treats moving a pending sender as a decision), and they can be
-  // blocked straight from here instead of trekking back to the list.
+  // server treats moving a pending sender as a decision). "Block" only
+  // files their held mail; for an approved sender the button becomes
+  // "Screen out", which sweeps ALL their mail into Screened Out — worth
+  // confirming before it hides everything the sender has ever sent.
   const isPendingSender = Boolean(senderEmail && pendingSenders?.senders.some((s) => s.email === senderEmail));
 
   return (
@@ -246,16 +248,24 @@ export function ThreadView() {
                 {label}
               </button>
             ))}
-            {isPendingSender && (
-              <button
-                type="button"
-                disabled={moveSender.isPending || decision.isPending}
-                onClick={() => decision.mutate({ email: senderEmail, action: 'block' })}
-                className="rounded-full border border-border px-3 py-1 text-sm font-semibold text-muted-foreground hover:bg-muted disabled:opacity-50"
-              >
-                Block
-              </button>
-            )}
+            <button
+              type="button"
+              disabled={moveSender.isPending || decision.isPending}
+              onClick={() => {
+                if (!isPendingSender && !confirm(`Screen out ${senderEmail}? All their mail will be hidden and auto-deleted after 90 days.`)) {
+                  return;
+                }
+                // Screening an approved sender out refiles the thread being
+                // viewed, so it no longer belongs in the current box.
+                decision.mutate(
+                  { email: senderEmail, action: 'block' },
+                  { onSuccess: () => !isPendingSender && navigate(-1) },
+                );
+              }}
+              className="rounded-full border border-border px-3 py-1 text-sm font-semibold text-muted-foreground hover:bg-muted disabled:opacity-50"
+            >
+              {isPendingSender ? 'Block' : 'Screen out'}
+            </button>
           </div>
         )}
       </div>

@@ -165,13 +165,43 @@ export async function approveSender(
   return threadIds;
 }
 
+// Screening out a sender files ALL of their non-trash/spam threads under
+// the blocked label, not just ones currently held: "Screen out" is offered
+// from any box's thread view, where the sender is usually approved with
+// mail sitting in INBOX or a bucket. The search deliberately has NO location
+// label (same reasoning as moveSenderToBucket): archived threads carry no
+// location label at all, and a label-scoped search silently missed them.
+// For a sender still held in the Gatekeeper this finds the same held
+// threads the old pending-only search did, so the Gatekeeper flow is
+// unchanged.
 export async function blockSender(mailProvider: MailProvider, email: string): Promise<void> {
+  const approval = getSenderApproval(email);
+  if (!approval) {
+    // Sender never went through the gate (e.g. mail predating yo). Seed a
+    // row so decideSender's UPDATE has something to land on.
+    insertPendingSender({
+      senderEmail: email,
+      senderDomain: email.split('@')[1] ?? '',
+      displayName: null,
+      firstSnippet: '',
+      firstThreadId: '',
+    });
+  }
+  // Capture the old bucket before decideSender clears it: approved
+  // senders' threads carry that bucket label and it must come off.
+  const oldBucket = approval?.bucket ?? null;
   decideSender(email, 'blocked');
-  const pendingLabelId = await ensureLabel(mailProvider, GATEKEEPER_PENDING_LABEL);
+
   const blockedLabelId = await ensureLabel(mailProvider, GATEKEEPER_BLOCKED_LABEL);
-  const threadIds = await findHeldThreadIds(mailProvider, email);
+  const pendingLabelId = await ensureLabel(mailProvider, GATEKEEPER_PENDING_LABEL);
+  const remove: string[] = [pendingLabelId, 'INBOX'];
+  if (oldBucket && BUCKET_LABELS[oldBucket]) {
+    remove.push(await ensureLabel(mailProvider, BUCKET_LABELS[oldBucket]));
+  }
+
+  const threadIds = await findThreadsByLabelAndSender(mailProvider, email, null);
   await mapWithConcurrency(threadIds, 5, (id) =>
-    mailProvider.modifyThreadLabels(id, { add: [blockedLabelId], remove: [pendingLabelId, 'INBOX'] }),
+    mailProvider.modifyThreadLabels(id, { add: [blockedLabelId], remove }),
   );
 }
 
