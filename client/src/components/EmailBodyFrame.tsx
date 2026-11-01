@@ -35,7 +35,14 @@ export function EmailBodyFrame({ html }: { html: string }) {
 <style>
   html, body { margin: 0; padding: 16px; background: #ffffff; color: #1a1a1a; }
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Arial, sans-serif; font-size: 15px; line-height: 1.5; word-wrap: break-word; }
-  img { max-width: 100%; height: auto; }
+  /* Emails are laid out for ~600px desktop viewports; without these caps,
+     fixed-width tables/divs and long <pre> lines blow past a phone screen
+     and the body pans sideways. !important is required to beat the inline
+     styles and width attributes that email HTML always carries. */
+  img, video, table, div, pre { max-width: 100% !important; }
+  pre { white-space: pre-wrap; overflow-wrap: break-word; }
+  td, th { overflow-wrap: break-word; } /* lets auto-layout tables shrink */
+  img { height: auto; }
   a { color: #3366cc; }
   /* Mail we compose ourselves wraps each list item's text in its own <p>
      (TipTap's doing). Without this, the paragraph's default browser margin
