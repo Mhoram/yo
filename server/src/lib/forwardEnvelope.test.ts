@@ -62,6 +62,24 @@ describe('buildForwardEnvelope', () => {
     expect(envelope.bodyText).not.toContain('<b>');
   });
 
+  it('lists original attachments in the quoted block', () => {
+    const envelope = buildForwardEnvelope(
+      baseMessage({
+        attachments: [
+          { attachmentId: 'a1', filename: 'report.pdf', mimeType: 'application/pdf', size: 123 },
+          { attachmentId: 'a2', filename: 'photo.jpg', mimeType: 'image/jpeg', size: 456 },
+        ],
+      }),
+      ['a@example.com'],
+    );
+    expect(envelope.bodyText).toContain('Attachments: report.pdf, photo.jpg');
+  });
+
+  it('omits the attachments line when the message has none', () => {
+    const envelope = buildForwardEnvelope(baseMessage(), ['a@example.com']);
+    expect(envelope.bodyText).not.toContain('Attachments:');
+  });
+
   it('prepends a personal note when one is given', () => {
     const envelope = buildForwardEnvelope(baseMessage(), ['a@example.com'], 'Thought you should see this');
     expect(envelope.bodyText.startsWith('Thought you should see this')).toBe(true);

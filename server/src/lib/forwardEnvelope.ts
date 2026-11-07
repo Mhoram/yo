@@ -39,15 +39,18 @@ export function buildForwardEnvelope(originalMessage: MailMessage, to: string[],
   const originalBody =
     originalMessage.bodyText ?? (originalMessage.bodyHtml ? stripHtml(originalMessage.bodyHtml) : '');
 
-  const quoted = [
+  const headerLines = [
     '---------- Forwarded message ---------',
     `From: ${formatAddress(originalMessage.from)}`,
     `Date: ${originalMessage.date}`,
     `Subject: ${originalMessage.subject}`,
     `To: ${originalMessage.to.map(formatAddress).join(', ')}`,
-    '',
-    originalBody,
-  ].join('\n');
+  ];
+  if (originalMessage.attachments.length > 0) {
+    headerLines.push(`Attachments: ${originalMessage.attachments.map((a) => a.filename).join(', ')}`);
+  }
+
+  const quoted = [...headerLines, '', originalBody].join('\n');
 
   const bodyText = note && note.trim().length > 0 ? `${note.trim()}\n\n${quoted}` : quoted;
 

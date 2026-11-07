@@ -117,11 +117,11 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ bucket }),
     }),
-  markThreadsSeen: (ids: string[]) =>
-    request<{ markedThreadIds: string[] }>('/api/threads/mark-seen', {
+  markAllThreadsSeen: (label: string) =>
+    request<{ markedThreadIds: string[]; capped: boolean }>('/api/threads/mark-all-seen', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ids }),
+      body: JSON.stringify({ label }),
     }),
   archiveThread: (id: string) => request<void>(`/api/threads/${id}/archive`, { method: 'POST' }),
   trashThread: (id: string) => request<void>(`/api/threads/${id}/trash`, { method: 'POST' }),

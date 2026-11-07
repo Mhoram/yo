@@ -1,6 +1,7 @@
 import { useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { useThreads, useMarkThreadsSeen } from '../hooks/useThreads';
+import { useThreads, useMarkAllThreadsSeen } from '../hooks/useThreads';
+import { useBoxes } from '../hooks/useBoxes';
 import { useInfiniteScrollTrigger } from '../hooks/useInfiniteScrollTrigger';
 import { ThreadRow } from './ThreadRow';
 import { NavBar } from './NavBar';
@@ -50,8 +51,17 @@ export function ThreadList({
   perspective?: 'received' | 'sent';
 }) {
   const { data, isLoading, error, fetchNextPage, hasNextPage, isFetchingNextPage } = useThreads(label);
-  const markSeen = useMarkThreadsSeen();
+  const markAllSeen = useMarkAllThreadsSeen();
+  const { data: boxes } = useBoxes();
   const sentinelRef = useRef<HTMLDivElement>(null);
+
+  // Map this list's label to its box-switcher key, so the bulk action and
+  // the badge count refer to the same box. Sent has no badge (nothing to
+  // mark read there), so no bulk action either.
+  const boxKey = label === 'feed' || label === 'receipts' ? label : label === 'INBOX' ? 'yobox' : undefined;
+  const boxUnread = boxes?.find((b) => b.key === boxKey);
+  const unreadCount = boxUnread?.unread ?? 0;
+  const unreadLabel = `${unreadCount}${boxUnread?.unreadCapped ? '+' : ''}`;
 
   useInfiniteScrollTrigger(sentinelRef, { hasNextPage, isFetchingNextPage, fetchNextPage });
 
@@ -78,7 +88,26 @@ export function ThreadList({
         className={`mt-6 overflow-hidden bg-background px-1 pb-2 pt-6 sm:bg-muted sm:px-6 ${previouslySeen.length > 0 ? 'rounded-t-xl' : 'rounded-xl'}`}
       >
         <div className="flex items-center justify-between gap-3 sm:block">
-          <h1 className="text-left text-4xl font-bold sm:text-center">{title}</h1>
+          <div className="flex items-center justify-between gap-3 sm:justify-center sm:gap-4">
+            <h1 className="text-left text-4xl font-bold sm:text-center">{title}</h1>
+            {/* Box-level bulk action: sweeps every unread thread in the
+                badge's recent-unread window, not just what's loaded here —
+                unread mail past the first page has no other bulk option. */}
+            {boxKey && unreadCount > 0 && (
+              <button
+                type="button"
+                disabled={markAllSeen.isPending}
+                onClick={() => {
+                  if (confirm(`Mark ${unreadLabel} unread in ${title} as read?`)) {
+                    markAllSeen.mutate(boxKey);
+                  }
+                }}
+                className="shrink-0 rounded-full border border-border px-3 py-1 text-xs font-semibold text-muted-foreground hover:bg-muted disabled:opacity-50"
+              >
+                {markAllSeen.isPending ? 'Marking…' : `Mark all as read (${unreadLabel})`}
+              </button>
+            )}
+          </div>
           <Link
             to="/compose"
             className="shrink-0 rounded-full bg-primary px-4 py-1.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 sm:hidden"
@@ -87,18 +116,7 @@ export function ThreadList({
           </Link>
         </div>
         <span className="mt-4 block h-px w-full rounded-full bg-gradient-to-r from-[#39ff14] to-[#00d4ff]" />
-        {newForYou.length > 0 && (
-          <SectionHeading
-            withRule
-            action={{
-              label: markSeen.isPending ? 'Marking…' : 'Mark all as seen',
-              disabled: markSeen.isPending,
-              onClick: () => markSeen.mutate(newForYou.map((t) => t.id)),
-            }}
-          >
-            New for you
-          </SectionHeading>
-        )}
+        {newForYou.length > 0 && <SectionHeading withRule>New for you</SectionHeading>}
         {newForYou.length > 0 ? (
           <ul className="divide-y divide-border">
             {newForYou.map((thread) => (

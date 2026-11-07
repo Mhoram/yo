@@ -12,6 +12,7 @@ import {
   type ThreadsInfiniteData,
 } from '../hooks/useThreads';
 import { EmailBodyFrame } from '../components/EmailBodyFrame';
+import { RecipientField } from '../components/RecipientField';
 import { RichTextEditor } from '../components/RichTextEditor';
 import { AttachmentPicker, attachmentsToPayload, type PendingAttachment } from '../components/AttachmentPicker';
 import { AttachmentViewer, type ViewingAttachment } from '../components/AttachmentViewer';
@@ -92,12 +93,16 @@ function ComposeBox({ threadId }: { threadId: string }) {
         </button>
       </div>
       {mode === 'forward' && (
-        <input
-          value={forwardTo}
-          onChange={(e) => setForwardTo(e.target.value)}
-          placeholder="To (comma-separated email addresses)"
-          className="mb-3 w-full rounded-md border border-border bg-background p-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-        />
+        <div className="mb-3">
+          {/* Same contact autocomplete as the Compose page, so recently used
+              addresses are suggested here too. */}
+          <RecipientField
+            value={forwardTo}
+            onChange={setForwardTo}
+            placeholder="To (comma-separated email addresses)"
+            exclude={[]}
+          />
+        </div>
       )}
       {mode === 'reply' ? (
         <RichTextEditor
@@ -177,6 +182,13 @@ export function ThreadView() {
         };
       });
       queryClient.invalidateQueries({ queryKey: ['gatekeeper'] });
+      // Opening an unread thread marks it read server-side (below), which
+      // also changes the box switcher's unread badges — without this the
+      // menu keeps showing a stale count until some other mutation
+      // happens to refresh it.
+      if (data.labelIds.includes('UNREAD')) {
+        queryClient.invalidateQueries({ queryKey: ['boxes'] });
+      }
     }
   }, [data, queryClient]);
 

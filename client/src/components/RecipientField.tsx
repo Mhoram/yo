@@ -9,6 +9,13 @@ function contactsFor(token: string, contacts: KnownContact[]): KnownContact[] {
   );
 }
 
+// Once the token already IS a complete address, drop it from the
+// suggestions — it's fully typed (or just selected), not something still
+// being completed.
+function dedupeExact(token: string, contacts: KnownContact[]): KnownContact[] {
+  return contacts.filter((c) => c.email.toLowerCase() !== token);
+}
+
 const fieldClass =
   'w-full rounded-md border border-border bg-background p-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary';
 
@@ -40,7 +47,7 @@ export function RecipientField({ value, onChange, placeholder, exclude }: Recipi
 
   const suggestions = useMemo(() => {
     const excluded = new Set(exclude.map((e) => e.toLowerCase()));
-    return contactsFor(token, contacts)
+    return dedupeExact(token, contactsFor(token, contacts))
       .filter((c) => !excluded.has(c.email.toLowerCase()))
       .slice(0, 6);
   }, [token, exclude, contacts]);
@@ -48,7 +55,10 @@ export function RecipientField({ value, onChange, placeholder, exclude }: Recipi
   function select(contact: KnownContact) {
     const lastComma = value.lastIndexOf(',');
     const before = lastComma >= 0 ? value.slice(0, lastComma + 1) + ' ' : '';
-    onChange(`${before}${contact.email}, `);
+    // No trailing comma: completing one address shouldn't presume another
+    // is coming. The user types the comma themselves to start the next
+    // address; the send path splits on commas either way.
+    onChange(`${before}${contact.email}`);
   }
 
   function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
