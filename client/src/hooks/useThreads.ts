@@ -68,13 +68,17 @@ function patchThreadsInCache(queryClient: QueryClient, ids: Iterable<string>, pa
   });
 }
 
-// "Mark all as seen" for the New-for-you section.
-export function useMarkThreadsSeen() {
+// "Mark all as read" for a whole box: sweeps every unread thread in the
+// box's recent-unread window (the same window the badge counts), capped
+// server-side. Supersedes the first-page-scoped variant above as the
+// one obvious bulk action.
+export function useMarkAllThreadsSeen() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (ids: string[]) => api.markThreadsSeen(ids),
+    mutationFn: (label: string) => api.markAllThreadsSeen(label),
     onSuccess: ({ markedThreadIds }) => {
       if (markedThreadIds.length > 0) patchThreadsInCache(queryClient, markedThreadIds, { unread: false });
+      queryClient.invalidateQueries({ queryKey: ['boxes'] });
     },
   });
 }
@@ -98,7 +102,11 @@ export function useArchiveThread() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => api.archiveThread(id),
-    onSuccess: (_data, id) => removeThreadsFromCache(queryClient, [id]),
+    onSuccess: (_data, id) => {
+      removeThreadsFromCache(queryClient, [id]);
+      // Archived unread mail no longer counts toward box badges.
+      queryClient.invalidateQueries({ queryKey: ['boxes'] });
+    },
   });
 }
 
@@ -106,7 +114,10 @@ export function useTrashThread() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => api.trashThread(id),
-    onSuccess: (_data, id) => removeThreadsFromCache(queryClient, [id]),
+    onSuccess: (_data, id) => {
+      removeThreadsFromCache(queryClient, [id]);
+      queryClient.invalidateQueries({ queryKey: ['boxes'] });
+    },
   });
 }
 
@@ -114,7 +125,10 @@ export function useMarkThreadUnread() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => api.markThreadUnread(id),
-    onSuccess: (_data, id) => patchThreadsInCache(queryClient, [id], { unread: true }),
+    onSuccess: (_data, id) => {
+      patchThreadsInCache(queryClient, [id], { unread: true });
+      queryClient.invalidateQueries({ queryKey: ['boxes'] });
+    },
   });
 }
 

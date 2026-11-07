@@ -10,6 +10,7 @@ import { parseAttachments } from '../lib/attachments.js';
 import { buildThreadSummary } from '../lib/threadSummary.js';
 import { recordOutgoingRecipients } from '../db/knownContacts.js';
 import { readThreadListPage, writeThreadListPage } from '../db/threadListCache.js';
+import { BADGE_WINDOW_DAYS } from './boxes.js';
 
 export function threadsRouter(mailProvider: MailProvider): Router {
   const router = Router();
@@ -137,6 +138,34 @@ export function threadsRouter(mailProvider: MailProvider): Router {
     }
   });
 
+  // "Mark all as read" for a whole box. Sweeps exactly the window the box
+  // badge counts (same query as boxesRouter — is:unread within
+  // BADGE_WINDOW_DAYS), so the button and the badge can never disagree
+  // about what "all" covers. Bounded at MAX_MARK_SEEN threads; anything
+  // beyond that is reported via `capped` instead of swept silently.
+  router.post('/mark-all-seen', async (req, res) => {
+    try {
+      const requestedLabel = typeof req.body?.label === 'string' ? req.body.label : 'INBOX';
+      const bucketLabelName = BUCKET_LABELS[requestedLabel];
+      const label = bucketLabelName ? await ensureLabel(mailProvider, bucketLabelName) : requestedLabel;
+
+      // One past the cap, so "hit the cap" is distinguishable from "that
+      // was everything" without a second list call.
+      const { threadIds } = await mailProvider.listThreadIds({
+        label,
+        q: `is:unread newer_than:${BADGE_WINDOW_DAYS}d`,
+        maxResults: MAX_MARK_SEEN + 1,
+      });
+      const capped = threadIds.length > MAX_MARK_SEEN;
+      const ids = threadIds.slice(0, MAX_MARK_SEEN);
+      await mapWithConcurrency(ids, 5, (id) => mailProvider.modifyThreadLabels(id, { remove: ['UNREAD'] }));
+      res.json({ markedThreadIds: ids, capped });
+    } catch (err) {
+      console.error('Failed to mark box as seen', err);
+      res.status(500).json({ error: (err as Error).message });
+    }
+  });
+
   // Resolves the two bucket label IDs once per request; used by both
   // archive and trash, which both need to strip a thread out of wherever
   // it currently sits (Yobox/Receipts/Feed) regardless of which one.
@@ -246,7 +275,33 @@ export function threadsRouter(mailProvider: MailProvider): Router {
       }
 
       const envelope = buildForwardEnvelope(last, to, typeof note === 'string' ? note : undefined);
-      const result = await mailProvider.sendMessage({ ...envelope, attachments });
+
+      // A forward should carry the original message's attachments, not just
+      // anything the user attached themselves. partIndex is the reliable
+      // address (Gmail rotates attachment IDs on every fetch) — same trick
+      // the attachment download route uses. Fetches fail loudly: silently
+      // dropping an attachment would be worse than not sending.
+      const originalAttachments = await mapWithConcurrency(
+        last.attachments.map((meta, partIndex) => ({ meta, partIndex })),
+        3,
+        async ({ meta, partIndex }) => {
+          try {
+            const att = await mailProvider.getAttachment(last.id, meta.attachmentId, { partIndex });
+            return {
+              filename: att.filename,
+              contentBase64: att.data.toString('base64'),
+              contentType: att.mimeType,
+            };
+          } catch (err) {
+            throw new Error(`Could not fetch attachment "${meta.filename}" from the original message: ${(err as Error).message}`);
+          }
+        },
+      );
+
+      const result = await mailProvider.sendMessage({
+        ...envelope,
+        attachments: [...(attachments ?? []), ...originalAttachments],
+      });
 
       // ForwardEnvelope has no cc — forwards only address `to` directly.
       recordOutgoingRecipients([envelope.to]);

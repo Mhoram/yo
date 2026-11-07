@@ -20,7 +20,9 @@ export interface BoxCount {
 // from rendering an absurd number. One threads.list per box, cached
 // client-side for 30s. The Gatekeeper count already comes from the local
 // pending-senders list, not Gmail.
-const BADGE_WINDOW_DAYS = 7;
+// Exported because "mark all as read" sweeps exactly this window — the
+// button and the badge must always agree on what "all" means.
+export const BADGE_WINDOW_DAYS = 7;
 const BADGE_CAP = 99;
 
 export function boxesRouter(mailProvider: MailProvider): Router {
