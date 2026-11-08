@@ -14,8 +14,9 @@ What works today:
 - The Gatekeeper: mail from unknown senders is held until you approve or block them
 - Picking a bucket (Yobox, Receipts, or Feed) when you approve a sender
 - Receipts and Feed views with infinite scroll
-- Compose, reply, forward, attachments
+- Compose, reply, forward (forwards carry the original message's attachments), attachments of your own
 - Recipient autocomplete in To/Cc/Bcc, built from your own sent and received mail plus approved senders (local cache, no quota cost while typing)
+- Unread badges per box in the box switcher, with a per-box "Mark all as read"
 - Search
 - Sent view, built on Gmail's `SENT` label but shown from the recipient's point of view
 - "Move to..." to change an approved sender's bucket from a thread view, or screen them out entirely
@@ -51,7 +52,7 @@ You need a Google Cloud project with a Gmail API OAuth client:
    - User type: External
    - Scopes: `https://www.googleapis.com/auth/gmail.modify` and `https://www.googleapis.com/auth/gmail.send`
    - Test users: add your own Gmail address
-   - Leave Publishing status as **Testing**. No verification needed for personal use.
+   - Publishing status: **Testing** works for personal use, but refresh tokens issued to a Testing app expire after 7 days no matter how often the app is used. To avoid weekly re-sign-ins, publish the app (**Google Auth Platform → Audience → Publish app**) — no verification needed for a single-user deployment; others just see an unverified-app warning. See [`deploy/self-host.md`](./deploy/self-host.md) §Troubleshooting.
 4. APIs & Services → Credentials → Create Credentials → OAuth client ID:
    - Application type: Web application
    - Authorized redirect URI: `http://localhost:3001/auth/callback`
@@ -73,7 +74,7 @@ npm run dev
 
 This starts the server on `http://localhost:3001` and the client on `http://localhost:5173` via `concurrently`. Vite proxies `/api` and `/auth` to the server, so the app is same-origin in dev. Open `http://localhost:5173` and sign in.
 
-One thing to know: while the OAuth consent screen is in "Testing" status, Google may expire refresh tokens after about 7 days of inactivity. If you get logged out unexpectedly, just sign in again. No data is lost; gatekeeper and bucket decisions live in the local SQLite database, not in the OAuth session.
+One thing to know: if you leave the OAuth consent screen in "Testing" status, Google expires the app's refresh tokens after 7 days (regardless of activity), and you'll have to sign in again when that happens. Publishing the app to production fixes this — see the setup note in step 3. No data is lost either way; gatekeeper and bucket decisions live in the local SQLite database, not in the OAuth session.
 
 ## How it works
 
