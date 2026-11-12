@@ -36,8 +36,15 @@ export interface ForwardEnvelope {
 export function buildForwardEnvelope(originalMessage: MailMessage, to: string[], note?: string): ForwardEnvelope {
   const subject = /^fwd:/i.test(originalMessage.subject) ? originalMessage.subject : `Fwd: ${originalMessage.subject}`;
 
+  // An empty bodyText must not win: `??` doesn't fall through on '' and
+  // some senders ship an empty text/plain part alongside the real HTML
+  // body, which made forwarded mail go out with no quoted body at all.
   const originalBody =
-    originalMessage.bodyText ?? (originalMessage.bodyHtml ? stripHtml(originalMessage.bodyHtml) : '');
+    originalMessage.bodyText && originalMessage.bodyText.trim().length > 0
+      ? originalMessage.bodyText
+      : originalMessage.bodyHtml
+        ? stripHtml(originalMessage.bodyHtml)
+        : '';
 
   const headerLines = [
     '---------- Forwarded message ---------',

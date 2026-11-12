@@ -12,6 +12,9 @@ interface RichTextEditorProps {
   placeholder?: string;
   onUpdate: (html: string, text: string) => void;
   autoFocus?: boolean;
+  /** Read once at mount (TipTap only reads `content` then); callers
+   * remount via `key` to change it — draft prefill does exactly that. */
+  initialHtml?: string;
 }
 
 function ToolbarButton({
@@ -41,8 +44,9 @@ function ToolbarButton({
   );
 }
 
-export function RichTextEditor({ placeholder, onUpdate, autoFocus }: RichTextEditorProps) {
+export function RichTextEditor({ placeholder, onUpdate, autoFocus, initialHtml }: RichTextEditorProps) {
   const editor = useEditor({
+    content: initialHtml,
     extensions: [
       StarterKit,
       Link.configure({ openOnClick: false, autolink: true }),

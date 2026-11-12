@@ -51,6 +51,17 @@ describe('buildForwardEnvelope', () => {
     expect(envelope.bodyText).not.toContain('Html body');
   });
 
+  it('prefers a non-empty plain-text body; an empty text part falls back to the HTML body', () => {
+    // Some senders ship an empty text/plain part next to the real HTML body;
+    // forwarding those used to produce a bodyless quote.
+    const envelope = buildForwardEnvelope(
+      baseMessage({ bodyText: '', bodyHtml: '<p>Html body</p>' }),
+      ['a@example.com'],
+    );
+    expect(envelope.bodyText).toContain('Html body');
+    expect(envelope.bodyText).not.toContain('<p>');
+  });
+
   it('falls back to a stripped version of the HTML body when there is no plain-text body', () => {
     const envelope = buildForwardEnvelope(
       baseMessage({ bodyHtml: '<p>Hello <b>world</b></p><p>Second paragraph</p>' }),

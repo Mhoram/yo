@@ -61,3 +61,25 @@ CREATE TABLE IF NOT EXISTS contacts_state (
   id INTEGER PRIMARY KEY CHECK (id = 1),
   backfilled_at TEXT
 );
+
+-- Locally-stored work-in-progress messages (compose / reply / forward).
+-- Deliberately NOT Gmail drafts: saving costs no Gmail quota (drafts.* calls
+-- are ~10 units each, and auto-save fires often), and reply/forward context
+-- (mode, replyAll, forward note) has no clean Gmail representation. Mail is
+-- still Gmail's source of truth; a draft is only work-in-progress.
+CREATE TABLE IF NOT EXISTS drafts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  kind TEXT NOT NULL CHECK (kind IN ('compose', 'reply', 'forward')),
+  thread_id TEXT,
+  to_addrs TEXT NOT NULL DEFAULT '',
+  cc_addrs TEXT NOT NULL DEFAULT '',
+  bcc_addrs TEXT NOT NULL DEFAULT '',
+  subject TEXT NOT NULL DEFAULT '',
+  body_html TEXT NOT NULL DEFAULT '',
+  body_text TEXT NOT NULL DEFAULT '',
+  reply_all INTEGER NOT NULL DEFAULT 0,
+  attachments_json TEXT,
+  updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_drafts_thread_kind ON drafts(thread_id, kind);

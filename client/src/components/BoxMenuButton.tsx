@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { usePendingSenders } from '../hooks/useGatekeeper';
 import { useBoxes } from '../hooks/useBoxes';
+import { useDrafts } from '../hooks/useDrafts';
 import { ThemeMenuItem } from './ThemeToggle';
 
 const menuLinkClass = ({ isActive }: { isActive: boolean }) =>
@@ -17,6 +18,7 @@ export function BoxMenuButton() {
   const { data } = usePendingSenders();
   const pendingCount = data?.senders.length ?? 0;
   const boxes = useBoxes().data;
+  const draftCount = useDrafts().data?.length ?? 0;
   // e.g. "Yobox (3)", or "Feed (99+)" when the week's unread runs past
   // the server's cap.
   const unreadLabel = (key: 'yobox' | 'receipts' | 'feed') => {
@@ -69,6 +71,9 @@ export function BoxMenuButton() {
             </NavLink>
             <NavLink to="/feed" className={menuLinkClass} onClick={close}>
               Feed{unreadLabel('feed')}
+            </NavLink>
+            <NavLink to="/drafts" className={menuLinkClass} onClick={close}>
+              Drafts{draftCount > 0 && ` (${draftCount})`}
             </NavLink>
             <NavLink to="/sent" className={menuLinkClass} onClick={close}>
               Sent
