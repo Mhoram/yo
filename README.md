@@ -16,6 +16,7 @@ What works today:
 - Receipts and Feed views with infinite scroll
 - Compose, reply, forward, attachments
 - Recipient autocomplete in To/Cc/Bcc, built from your own sent and received mail plus approved senders (local cache, no quota cost while typing)
+- Drafts: unfinished compose, reply, and forward messages auto-save locally (2s after you stop typing) and reopen from the Drafts menu entry — no Gmail quota cost, nothing appears in Gmail's own Drafts folder
 - Search
 - Sent view, built on Gmail's `SENT` label but shown from the recipient's point of view
 - "Move to..." to change an approved sender's bucket from a thread view, or screen them out entirely
