@@ -54,16 +54,34 @@ export function saveDraft(id: number | undefined, input: DraftInput): DraftRow {
   };
 
   if (id !== undefined) {
-    db.prepare(
+    const result = db.prepare(
       `UPDATE drafts SET kind = @kind, thread_id = @threadId, to_addrs = @to, cc_addrs = @cc,
        bcc_addrs = @bcc, subject = @subject, body_html = @bodyHtml, body_text = @bodyText,
        reply_all = @replyAll, attachments_json = @attachmentsJson, updated_at = @updatedAt
        WHERE id = @id`,
     ).run({ ...params, id });
-    const row = getDraft(id);
-    if (row) return row;
-    // Row vanished between list and save (deleted elsewhere): fall through
-    // and insert a fresh one rather than losing the content.
+
+    if (result.changes > 0) {
+      // The UPDATE just wrote every field, so the row now holds exactly
+      // `params` — no SELECT needed to return it.
+      return {
+        id,
+        kind: input.kind,
+        thread_id: params.threadId,
+        to_addrs: params.to,
+        cc_addrs: params.cc,
+        bcc_addrs: params.bcc,
+        subject: params.subject,
+        body_html: params.bodyHtml,
+        body_text: params.bodyText,
+        reply_all: params.replyAll,
+        attachments_json: params.attachmentsJson,
+        updated_at: params.updatedAt,
+      };
+    }
+    // changes === 0: the row was deleted between the client loading it and
+    // this save (e.g. deleted from another tab). Fall through and INSERT so
+    // the content isn't lost.
   }
 
   const result = db
