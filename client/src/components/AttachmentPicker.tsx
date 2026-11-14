@@ -24,6 +24,19 @@ export function attachmentsToPayload(attachments: PendingAttachment[]) {
   }));
 }
 
+// Inverse of attachmentsToPayload, for restoring a saved draft: rebuilds
+// real File objects from the stored payload so the picker and the send path
+// treat restored and freshly-picked files identically.
+export function payloadToPendingAttachments(
+  payload: { filename: string; contentBase64: string; contentType?: string }[],
+): PendingAttachment[] {
+  return payload.map((a) => {
+    const bytes = Uint8Array.from(atob(a.contentBase64), (c) => c.charCodeAt(0));
+    const file = new File([bytes], a.filename, { type: a.contentType ?? 'application/octet-stream' });
+    return { file, contentBase64: a.contentBase64 };
+  });
+}
+
 interface AttachmentPickerProps {
   attachments: PendingAttachment[];
   onChange: (attachments: PendingAttachment[]) => void;

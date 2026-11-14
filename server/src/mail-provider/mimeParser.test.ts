@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseAddress, parseAddressList, splitAddressList } from './mimeParser.js';
+import { parseAddress, parseAddressList, parseGmailMessage, splitAddressList } from './mimeParser.js';
 
 describe('parseAddress', () => {
   it('parses "Name <email>" form', () => {
@@ -69,5 +69,63 @@ describe('parseAddressList', () => {
       { name: 'Doe, Jane', email: 'jane@example.com' },
       { email: 'bob@example.com' },
     ]);
+  });
+});
+
+describe('parseGmailMessage body extraction', () => {
+  const htmlData = Buffer.from('<p>real body</p>').toString('base64url');
+
+  it('does not misclassify a text/html body part that carries a filename', () => {
+    // Outlook/Exchange name their body parts (inline; filename="body.html")
+    const msg: Parameters<typeof parseGmailMessage>[0] = {
+      id: 'm1',
+      threadId: 't1',
+      snippet: '',
+      payload: {
+        mimeType: 'multipart/mixed',
+        headers: [],
+        parts: [
+          {
+            mimeType: 'text/html',
+            filename: 'body.html',
+            headers: [
+              { name: 'Content-Type', value: 'text/html' },
+              { name: 'Content-Disposition', value: 'inline; filename="body.html"' },
+            ],
+            body: { data: htmlData, attachmentId: 'A1', size: 10 },
+          },
+        ],
+      },
+    };
+    const { message } = parseGmailMessage(msg);
+    expect(message.bodyHtml).toBe('<p>real body</p>');
+    expect(message.attachments).toHaveLength(0);
+  });
+
+  it('still treats an explicitly attached text file as an attachment', () => {
+    const msg: Parameters<typeof parseGmailMessage>[0] = {
+      id: 'm1',
+      threadId: 't1',
+      snippet: '',
+      payload: {
+        mimeType: 'multipart/mixed',
+        headers: [],
+        parts: [
+          {
+            mimeType: 'text/plain',
+            filename: 'notes.txt',
+            headers: [
+              { name: 'Content-Type', value: 'text/plain' },
+              { name: 'Content-Disposition', value: 'attachment; filename="notes.txt"' },
+            ],
+            body: { data: Buffer.from('attached text').toString('base64url'), attachmentId: 'A2', size: 13 },
+          },
+        ],
+      },
+    };
+    const { message } = parseGmailMessage(msg);
+    expect(message.bodyText).toBeUndefined();
+    expect(message.attachments).toHaveLength(1);
+    expect(message.attachments[0].filename).toBe('notes.txt');
   });
 });

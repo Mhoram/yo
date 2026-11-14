@@ -63,6 +63,37 @@ export interface BlockedSender {
 
 export type ApprovalBucket = 'yobox' | 'receipts' | 'feed';
 
+export type DraftKind = 'compose' | 'reply' | 'forward';
+
+export interface Draft {
+  id: number;
+  kind: DraftKind;
+  threadId: string | null;
+  to: string;
+  cc: string;
+  bcc: string;
+  subject: string;
+  bodyHtml: string;
+  bodyText: string;
+  replyAll: boolean;
+  attachments: { filename: string; contentBase64: string; contentType?: string }[] | null;
+  updatedAt: string;
+}
+
+export interface DraftInput {
+  id?: number;
+  kind: DraftKind;
+  threadId?: string | null;
+  to?: string;
+  cc?: string;
+  bcc?: string;
+  subject?: string;
+  bodyHtml?: string;
+  bodyText?: string;
+  replyAll?: boolean;
+  attachments?: { filename: string; contentBase64: string; contentType?: string }[];
+}
+
 export interface KnownContact {
   email: string;
   name: string | null;
@@ -123,6 +154,19 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ label }),
     }),
+  listDrafts: () => request<{ drafts: Draft[] }>('/api/drafts'),
+  getDraft: (id: number) => request<{ draft: Draft }>(`/api/drafts/${id}`),
+  findDraft: (threadId: string, kind: 'reply' | 'forward') =>
+    request<{ draft: Draft | null }>(
+      `/api/drafts?threadId=${encodeURIComponent(threadId)}&kind=${kind}`,
+    ),
+  saveDraft: (input: DraftInput) =>
+    request<{ draft: Draft }>('/api/drafts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    }),
+  deleteDraft: (id: number) => request<{ deleted: boolean }>(`/api/drafts/${id}`, { method: 'DELETE' }),
   archiveThread: (id: string) => request<void>(`/api/threads/${id}/archive`, { method: 'POST' }),
   trashThread: (id: string) => request<void>(`/api/threads/${id}/trash`, { method: 'POST' }),
   markThreadUnread: (id: string) => request<void>(`/api/threads/${id}/unread`, { method: 'POST' }),

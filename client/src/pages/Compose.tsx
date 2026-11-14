@@ -1,10 +1,12 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { NavBar } from '../components/NavBar';
 import { RichTextEditor } from '../components/RichTextEditor';
-import { AttachmentPicker, attachmentsToPayload, type PendingAttachment } from '../components/AttachmentPicker';
+import { AttachmentPicker, attachmentsToPayload, payloadToPendingAttachments, type PendingAttachment } from '../components/AttachmentPicker';
 import { RecipientField } from '../components/RecipientField';
 import { useComposeMessage } from '../hooks/useCompose';
+import { useDeleteDraft, useDraftById, useSaveDraft } from '../hooks/useDrafts';
+import type { Draft } from '../lib/api';
 
 function parseEmailList(raw: string): string[] {
   return raw
@@ -24,8 +26,64 @@ export function Compose() {
   const [bodyHtml, setBodyHtml] = useState('');
   const [bodyText, setBodyText] = useState('');
   const [attachments, setAttachments] = useState<PendingAttachment[]>([]);
+  const [draftId, setDraftId] = useState<number | undefined>();
+  const [savingDraft, setSavingDraft] = useState(false);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const compose = useComposeMessage();
+  const saveDraft = useSaveDraft();
+  const deleteDraft = useDeleteDraft();
+
+  // Reopening a saved draft: /compose?draft=N pre-fills the form once. The
+  // attachment payload round-trips through File objects so the picker (and
+  // the send path) treat restored and freshly-picked files identically.
+  const prefillDraftId = searchParams.get('draft');
+  const { data: prefillData } = useDraftById(prefillDraftId ? Number(prefillDraftId) : undefined);
+  const prefilledFor = useRef<number | null>(null);
+  useEffect(() => {
+    const draft: Draft | undefined = prefillData?.draft;
+    if (!draft || prefilledFor.current === draft.id) return;
+    prefilledFor.current = draft.id;
+    setDraftId(draft.id);
+    setTo(draft.to);
+    setCc(draft.cc);
+    setBcc(draft.bcc);
+    setSubject(draft.subject);
+    setBodyHtml(draft.bodyHtml);
+    setBodyText(draft.bodyText);
+    setAttachments(payloadToPendingAttachments(draft.attachments ?? []));
+  }, [prefillData]);
+
+  // Auto-save: 2s after the last change to any draft-relevant field, as
+  // long as there's something worth saving and the content actually moved
+  // since the last save (otherwise every keystroke round-trips).
+  const lastSaved = useRef('');
+  const draftPayload = {
+    id: draftId,
+    kind: 'compose' as const,
+    to,
+    cc,
+    bcc,
+    subject,
+    bodyHtml,
+    bodyText,
+    attachments: attachments.length > 0 ? attachmentsToPayload(attachments) : undefined,
+  };
+  const hasContent =
+    to.trim().length > 0 || cc.trim().length > 0 || bcc.trim().length > 0 || subject.trim().length > 0 || bodyText.trim().length > 0;
+  useEffect(() => {
+    const serialized = JSON.stringify(draftPayload);
+    if (!hasContent || serialized === lastSaved.current || saveDraft.isPending) return;
+    const timer = setTimeout(() => {
+      lastSaved.current = serialized;
+      setSavingDraft(true);
+      saveDraft.mutate(draftPayload, {
+        onSuccess: ({ draft }) => setDraftId(draft.id),
+        onSettled: () => setSavingDraft(false),
+      });
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, [draftPayload, hasContent]);
 
   const toList = parseEmailList(to);
   const ccList = parseEmailList(cc);
@@ -47,7 +105,14 @@ export function Compose() {
         bodyHtml,
         attachments: attachments.length > 0 ? attachmentsToPayload(attachments) : undefined,
       },
-      { onSuccess: () => navigate('/') },
+      {
+        onSuccess: () => {
+          // A sent draft is no longer a draft. Fire-and-forget: navigation
+          // shouldn't wait on (or fail because of) the cleanup call.
+          if (draftId !== undefined) deleteDraft.mutate(draftId);
+          navigate('/');
+        },
+      },
     );
   }
 
@@ -67,6 +132,8 @@ export function Compose() {
           className={fieldClass}
         />
         <RichTextEditor
+          key={prefilledFor.current ?? 'blank'}
+          initialHtml={prefilledFor.current !== null ? bodyHtml : undefined}
           placeholder="Write your message..."
           onUpdate={(html, text) => {
             setBodyHtml(html);
@@ -78,6 +145,7 @@ export function Compose() {
           <button type="button" onClick={() => navigate(-1)} className="text-sm text-muted-foreground hover:underline">
             Cancel
           </button>
+          <span className="text-xs text-muted-foreground">{savingDraft ? 'Saving draft…' : draftId !== undefined ? 'Draft saved' : ''}</span>
           <button
             type="button"
             disabled={compose.isPending || !canSend}

@@ -74,7 +74,16 @@ function walkParts(part: gmail_v1.Schema$MessagePart | undefined, result: WalkRe
     });
   }
 
-  if (part.filename && part.filename.length > 0 && part.body?.attachmentId) {
+  // A text/* part with a filename is still a body, not an attachment —
+  // Outlook/Exchange name their body parts (`Content-Disposition: inline;
+  // filename="body.html"`), and burying it in attachments loses the message
+  // body entirely. Only a text part explicitly marked Content-Disposition:
+  // attachment (an attached .txt file) counts as an attachment.
+  const mimeType = part.mimeType ?? '';
+  const disposition = getHeader(part.headers, 'Content-Disposition').toLowerCase();
+  const isInlineText = mimeType.startsWith('text/') && !disposition.includes('attachment');
+
+  if (part.filename && part.filename.length > 0 && part.body?.attachmentId && !isInlineText) {
     result.attachments.push({
       attachmentId: part.body.attachmentId,
       filename: part.filename,

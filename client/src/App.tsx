@@ -14,6 +14,7 @@ const Sent = lazy(() => import('./pages/Sent').then((m) => ({ default: m.Sent })
 const Gatekeeper = lazy(() => import('./pages/Gatekeeper').then((m) => ({ default: m.Gatekeeper })));
 const ThreadView = lazy(() => import('./pages/ThreadView').then((m) => ({ default: m.ThreadView })));
 const Compose = lazy(() => import('./pages/Compose').then((m) => ({ default: m.Compose })));
+const Drafts = lazy(() => import('./pages/Drafts').then((m) => ({ default: m.Drafts })));
 const Search = lazy(() => import('./pages/Search').then((m) => ({ default: m.Search })));
 
 function AuthGate({ children }: { children: React.ReactNode }) {
@@ -42,6 +43,7 @@ export function App() {
           <Route path="/sent" element={<Sent />} />
           <Route path="/gatekeeper" element={<Gatekeeper />} />
           <Route path="/compose" element={<Compose />} />
+          <Route path="/drafts" element={<Drafts />} />
           <Route path="/search" element={<Search />} />
           <Route path="/thread/:id" element={<ThreadView />} />
             <Route path="*" element={<Navigate to="/" replace />} />

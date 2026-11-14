@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   useThread,
@@ -14,9 +14,10 @@ import {
 import { EmailBodyFrame } from '../components/EmailBodyFrame';
 import { RecipientField } from '../components/RecipientField';
 import { RichTextEditor } from '../components/RichTextEditor';
-import { AttachmentPicker, attachmentsToPayload, type PendingAttachment } from '../components/AttachmentPicker';
+import { AttachmentPicker, attachmentsToPayload, payloadToPendingAttachments, type PendingAttachment } from '../components/AttachmentPicker';
 import { AttachmentViewer, type ViewingAttachment } from '../components/AttachmentViewer';
 import { usePendingSenders, useGatekeeperDecision } from '../hooks/useGatekeeper';
+import { useDeleteDraft, useDraftById, useDraftForThread, useSaveDraft } from '../hooks/useDrafts';
 import { formatDateTime } from '../lib/format';
 import type { ApprovalBucket } from '../lib/api';
 
@@ -26,7 +27,7 @@ const BUCKET_OPTIONS: { bucket: ApprovalBucket; label: string }[] = [
   { bucket: 'feed', label: 'Feed' },
 ];
 
-function ComposeBox({ threadId }: { threadId: string }) {
+function ComposeBox({ threadId, reopenDraftId }: { threadId: string; reopenDraftId?: number }) {
   const [mode, setMode] = useState<'reply' | 'forward'>('reply');
   const [replyHtml, setReplyHtml] = useState('');
   const [replyText, setReplyText] = useState('');
@@ -35,8 +36,39 @@ function ComposeBox({ threadId }: { threadId: string }) {
   const [forwardNote, setForwardNote] = useState('');
   const [attachments, setAttachments] = useState<PendingAttachment[]>([]);
   const [editorKey, setEditorKey] = useState(0);
+  const [draftId, setDraftId] = useState<number | undefined>();
+  const [savingDraft, setSavingDraft] = useState(false);
   const reply = useReplyToThread();
   const forward = useForwardThread();
+  const saveDraft = useSaveDraft();
+  const deleteDraft = useDeleteDraft();
+
+  // Draft prefill: either the draft explicitly reopened from the Drafts
+  // page (?draft=N), or whatever was last auto-saved for this thread+mode.
+  // Prefill applies once per draft id (refs), remounting the editor with
+  // the saved HTML via key changes.
+  const { data: reopenData } = useDraftById(reopenDraftId);
+  const { data: forThreadData } = useDraftForThread(threadId, mode);
+  const prefilledFor = useRef<number | null>(null);
+  const reopenKind = reopenData?.draft.kind;
+  useEffect(() => {
+    const draft = reopenData?.draft ?? forThreadData?.draft;
+    if (!draft || prefilledFor.current === draft.id) return;
+    prefilledFor.current = draft.id;
+    setDraftId(draft.id);
+    if (reopenKind === 'forward' || (!reopenData?.draft && draft.kind === 'forward')) setMode('forward');
+    if (reopenKind === 'reply' || (!reopenData?.draft && draft.kind === 'reply')) setMode('reply');
+    if (draft.kind === 'forward') {
+      setForwardTo(draft.to);
+      setForwardNote(draft.bodyText);
+    } else {
+      setReplyAll(draft.replyAll);
+      setReplyHtml(draft.bodyHtml);
+      setReplyText(draft.bodyText);
+    }
+    setAttachments(payloadToPendingAttachments(draft.attachments ?? []));
+    setEditorKey((k) => k + 1); // remount editor with the draft's HTML
+  }, [reopenData, forThreadData, reopenKind]);
 
   const active = mode === 'reply' ? reply : forward;
   const forwardRecipients = forwardTo
@@ -45,12 +77,41 @@ function ComposeBox({ threadId }: { threadId: string }) {
     .filter(Boolean);
   const attachmentPayload = attachments.length > 0 ? attachmentsToPayload(attachments) : undefined;
 
+  // Auto-save the compose context (same debounce-and-dedupe pattern as the
+  // Compose page): reply drafts keep the rich-text body, forward drafts
+  // keep recipients + note. Attachments ride along in both.
+  const lastSaved = useRef('');
+  const draftPayload =
+    mode === 'reply'
+      ? { id: draftId, kind: 'reply' as const, threadId, bodyHtml: replyHtml, bodyText: replyText, replyAll, attachments: attachmentPayload }
+      : { id: draftId, kind: 'forward' as const, threadId, to: forwardTo, bodyText: forwardNote, attachments: attachmentPayload };
+  const hasContent =
+    mode === 'reply'
+      ? replyText.trim().length > 0
+      : forwardRecipients.length > 0 || forwardNote.trim().length > 0;
+  useEffect(() => {
+    const serialized = JSON.stringify(draftPayload);
+    if (!hasContent || serialized === lastSaved.current) return;
+    const timer = setTimeout(() => {
+      lastSaved.current = serialized;
+      setSavingDraft(true);
+      saveDraft.mutate(draftPayload, {
+        onSuccess: ({ draft }) => setDraftId(draft.id),
+        onSettled: () => setSavingDraft(false),
+      });
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, [draftPayload, hasContent]);
+
   function reset() {
     setReplyHtml('');
     setReplyText('');
     setForwardTo('');
     setForwardNote('');
     setAttachments([]);
+    setDraftId(undefined);
+    prefilledFor.current = null;
+    lastSaved.current = '';
     setEditorKey((k) => k + 1); // remounts the rich text editor empty
   }
 
@@ -58,12 +119,22 @@ function ComposeBox({ threadId }: { threadId: string }) {
     if (mode === 'reply') {
       reply.mutate(
         { threadId, bodyText: replyText, bodyHtml: replyHtml, replyAll, attachments: attachmentPayload },
-        { onSuccess: reset },
+        {
+          onSuccess: () => {
+            if (draftId !== undefined) deleteDraft.mutate(draftId);
+            reset();
+          },
+        },
       );
     } else {
       forward.mutate(
         { threadId, to: forwardRecipients, note: forwardNote, attachments: attachmentPayload },
-        { onSuccess: reset },
+        {
+          onSuccess: () => {
+            if (draftId !== undefined) deleteDraft.mutate(draftId);
+            reset();
+          },
+        },
       );
     }
   }
@@ -107,6 +178,7 @@ function ComposeBox({ threadId }: { threadId: string }) {
       {mode === 'reply' ? (
         <RichTextEditor
           key={editorKey}
+          initialHtml={draftId !== undefined ? replyHtml : undefined}
           placeholder="Write a reply..."
           onUpdate={(html, text) => {
             setReplyHtml(html);
@@ -132,6 +204,7 @@ function ComposeBox({ threadId }: { threadId: string }) {
         ) : (
           <span />
         )}
+        <span className="text-xs text-muted-foreground">{savingDraft ? 'Saving draft…' : draftId !== undefined ? 'Draft saved' : ''}</span>
         <button
           type="button"
           disabled={active.isPending || !canSend}
@@ -149,6 +222,8 @@ function ComposeBox({ threadId }: { threadId: string }) {
 
 export function ThreadView() {
   const { id } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
+  const reopenDraftId = searchParams.get('draft') ? Number(searchParams.get('draft')) : undefined;
   const { data, isLoading, error } = useThread(id);
   const [viewing, setViewing] = useState<ViewingAttachment | null>(null);
   const queryClient = useQueryClient();
@@ -349,7 +424,7 @@ export function ThreadView() {
           </article>
         ))}
       </div>
-      <ComposeBox threadId={data.id} />
+      <ComposeBox threadId={data.id} reopenDraftId={Number.isInteger(reopenDraftId) ? reopenDraftId : undefined} />
       {viewing && <AttachmentViewer attachment={viewing} onClose={() => setViewing(null)} />}
     </div>
   );
