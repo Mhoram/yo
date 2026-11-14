@@ -1,4 +1,4 @@
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useDrafts, useDeleteDraft } from '../hooks/useDrafts';
 import { NavBar } from '../components/NavBar';
 import { formatDateTime } from '../lib/format';
@@ -21,7 +21,6 @@ function draftTarget(draft: Draft): string {
 export function Drafts() {
   const { data: drafts, isLoading, error } = useDrafts();
   const deleteDraft = useDeleteDraft();
-  const navigate = useNavigate();
 
   return (
     <div className="mx-auto max-w-5xl px-2 pb-10 sm:px-6">
@@ -39,11 +38,9 @@ export function Drafts() {
         <ul className="divide-y divide-border overflow-hidden rounded-xl bg-card">
           {drafts.map((draft) => (
             <li key={draft.id} className="flex items-center gap-3 p-4">
-              <button
-                type="button"
-                onClick={() => navigate(draftTarget(draft))}
-                className="min-w-0 flex-1 text-left"
-              >
+              {/* A real link, not a click handler: drafts should open via
+                  middle-click / new tab like any other navigable thing. */}
+              <Link to={draftTarget(draft)} className="min-w-0 flex-1 text-left">
                 <p className="truncate text-sm font-semibold text-foreground">
                   {draft.subject.trim().length > 0 ? draft.subject : '(no subject)'}
                 </p>
@@ -53,7 +50,7 @@ export function Drafts() {
                   {' · '}
                   {formatDateTime(draft.updatedAt)}
                 </p>
-              </button>
+              </Link>
               <button
                 type="button"
                 onClick={() => deleteDraft.mutate(draft.id)}
