@@ -54,7 +54,17 @@ export function boxesRouter(mailProvider: MailProvider): Router {
       // Receipts/Feed briefly keep INBOX before their label move lands.
       // Counting raw INBOX unread therefore counts mail Yobox will never
       // show. The -in: exclusions align the badge with the list's gating.
-      const YOBOX_EXCLUSIONS = ` -in:${GATEKEEPER_PENDING_LABEL} -in:${GATEKEEPER_BLOCKED_LABEL} -in:${BUCKET_LABELS.receipts} -in:${BUCKET_LABELS.feed}`;
+      // Quote labels containing spaces — a future "App/My Feed" label must
+      // not fall apart into a broken query.
+      const quoteLabel = (label: string) => (label.includes(' ') ? `"${label}"` : label);
+      const YOBOX_EXCLUSIONS = [
+        GATEKEEPER_PENDING_LABEL,
+        GATEKEEPER_BLOCKED_LABEL,
+        BUCKET_LABELS.receipts,
+        BUCKET_LABELS.feed,
+      ]
+        .map((label) => ` -in:${quoteLabel(label)}`)
+        .join('');
       const [yobox, receipts, feed] = await Promise.all([
         recentUnread('INBOX', YOBOX_EXCLUSIONS),
         recentUnread(receiptsId),
