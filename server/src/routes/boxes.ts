@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import type { MailProvider } from '../mail-provider/MailProvider.js';
-import { BUCKET_LABELS } from '../gatekeeper/gatekeeperService.js';
+import { BUCKET_LABELS, GATEKEEPER_PENDING_LABEL, GATEKEEPER_BLOCKED_LABEL } from '../gatekeeper/gatekeeperService.js';
 import { ensureLabel } from '../mail-provider/labelRegistry.js';
 
 export interface BoxCount {
@@ -37,18 +37,26 @@ export function boxesRouter(mailProvider: MailProvider): Router {
         ensureLabel(mailProvider, BUCKET_LABELS.receipts),
         ensureLabel(mailProvider, BUCKET_LABELS.feed),
       ]);
-      const recentUnread = async (labelId: string) => {
+      const recentUnread = async (labelId: string, extraQuery = '') => {
         // Fetch one past the cap so "more than cap" is distinguishable
         // without paging.
         const { threadIds } = await mailProvider.listThreadIds({
           label: labelId,
-          q: `is:unread newer_than:${BADGE_WINDOW_DAYS}d`,
+          q: `is:unread newer_than:${BADGE_WINDOW_DAYS}d${extraQuery}`,
           maxResults: BADGE_CAP + 1,
         });
         return { unread: Math.min(threadIds.length, BADGE_CAP), unreadCapped: threadIds.length > BADGE_CAP };
       };
+      // Yobox's badge must match what the Yobox LIST shows, and the list
+      // hides more than raw INBOX: gateThreadBySender pulls unknown senders'
+      // mail into the Gatekeeper queue (App/Gatekeeper-Pending, still INBOX
+      // until filed), hides blocked senders, and approved senders filed to
+      // Receipts/Feed briefly keep INBOX before their label move lands.
+      // Counting raw INBOX unread therefore counts mail Yobox will never
+      // show. The -in: exclusions align the badge with the list's gating.
+      const YOBOX_EXCLUSIONS = ` -in:${GATEKEEPER_PENDING_LABEL} -in:${GATEKEEPER_BLOCKED_LABEL} -in:${BUCKET_LABELS.receipts} -in:${BUCKET_LABELS.feed}`;
       const [yobox, receipts, feed] = await Promise.all([
-        recentUnread('INBOX'),
+        recentUnread('INBOX', YOBOX_EXCLUSIONS),
         recentUnread(receiptsId),
         recentUnread(feedId),
       ]);
