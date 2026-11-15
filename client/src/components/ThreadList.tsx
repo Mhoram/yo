@@ -1,5 +1,6 @@
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { useThreads, useMarkAllThreadsSeen } from '../hooks/useThreads';
 import { useBoxes } from '../hooks/useBoxes';
 import { useInfiniteScrollTrigger } from '../hooks/useInfiniteScrollTrigger';
@@ -62,6 +63,18 @@ export function ThreadList({
   const boxUnread = boxes?.find((b) => b.key === boxKey);
   const unreadCount = boxUnread?.unread ?? 0;
   const unreadLabel = `${unreadCount}${boxUnread?.unreadCapped ? '+' : ''}`;
+
+  const queryClient = useQueryClient();
+
+  // Second-chance badge correction: Gmail's is:unread search index lags a
+  // few seconds behind the label change made when a thread is opened, so the
+  // badge refetch triggered on open often still counts the just-read thread.
+  // Re-invalidating on every box-list view catches that lag (and anything
+  // else that changed labels without the app knowing) for the price of one
+  // badge query. Sent has no badge, so no refetch there.
+  useEffect(() => {
+    if (boxKey) queryClient.invalidateQueries({ queryKey: ['boxes'] });
+  }, [boxKey, queryClient]);
 
   useInfiniteScrollTrigger(sentinelRef, { hasNextPage, isFetchingNextPage, fetchNextPage });
 
