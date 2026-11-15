@@ -346,3 +346,77 @@ docker compose up -d
 
 Then verify the app comes up with its history intact (`docker compose logs
 -f`, then sign in and check Yobox and the Gatekeeper).
+
+## 9. Testing locally against prod data
+
+The dev machine's SQLite DB (`server/data/yo.db`) drifts from prod's the
+moment both are used: gatekeeper decisions, known contacts, drafts and the
+sync cursor live in that file, and each instance only ever sees its own copy.
+Before testing a change against real data, snapshot prod's DB into the local
+checkout, then pause prod so the two instances don't gate the same Gmail
+account independently (double filing, split quota, renewed drift).
+
+**Do not run prod and dev against the same Gmail at the same time.** Pause
+prod (step 3) while the local instance is in use.
+
+Substitute `<you>` and `<media-pc-ip>` as in §0. Both machines must use the
+**same Google OAuth client** (same `GOOGLE_CLIENT_ID`/`SECRET`, per §3) — the
+copied refresh token is bound to the client, not to the redirect URI.
+
+### 9a. Snapshot prod's DB (home machine)
+
+The `better-sqlite3` `.backup()` call is safe on a running WAL-mode database;
+no container downtime needed.
+
+```bash
+ssh <you>@<media-pc-ip>
+cd ~/yo
+docker compose exec yo node -e \
+  "require('better-sqlite3')('server/data/yo.db').backup('/app/server/data/yo.db.snapshot').then(() => console.log('ok'))"
+docker compose cp yo:/app/server/data/yo.db.snapshot ./yo.db.snapshot
+```
+
+### 9b. Pull it into the local checkout (dev machine)
+
+```bash
+scp <you>@<media-pc-ip>:~/yo/yo.db.snapshot ~/Dev/yo/server/data/yo.db.snapshot
+```
+
+### 9c. Swap it in (dev machine, server stopped)
+
+Stop the dev server first (`Ctrl+C` on `npm run dev`). Stale WAL files next to
+a fresh main file corrupt the copy, so remove them:
+
+```bash
+cd ~/Dev/yo/server/data
+mv yo.db yo.db.pre-sync           # keep the local DB as a fallback
+rm -f yo.db-wal yo.db-shm
+mv yo.db.snapshot yo.db
+```
+
+### 9d. Pause prod while the local instance is in use (home machine)
+
+```bash
+cd ~/yo && docker compose stop yo
+```
+
+### 9e. Test, then put things back
+
+Start the local server (`npm run dev`) and verify: the box menu and Gatekeeper
+page should show prod's decisions and counts. Mail content and unread state
+were always live — they come from Gmail, not the DB.
+
+When done, resume prod and deal with any decisions made locally:
+
+```bash
+cd ~/yo && docker compose start yo
+```
+
+- Decisions made locally live only in the snapshot. Either redo them in
+  prod's UI, or copy the snapshot back to prod the same way (§9a in reverse:
+  stop prod, `sudo cp yo.db ~/yo/server/data/yo.db`, `docker compose start yo`).
+- To put the dev machine back on its own data:
+  `mv yo.db.pre-sync yo.db` (server stopped, WAL files removed as in §9c).
+
+The snapshot drifts from prod as soon as prod is in use again — re-sync at
+the start of each test session rather than keeping one long-running dev copy.
