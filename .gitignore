@@ -6,6 +6,8 @@ deploy/backup.env
 PLAN.md
 TODO.md
 docs/go-public.md
+docs/hosted-service.md
+docs/hosted-service-saas-feasibility.md
 server/data/*.db
 server/data/*.db-*
 *.log
