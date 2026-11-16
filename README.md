@@ -123,6 +123,9 @@ Run from `server/` with `npx tsx scripts/<name>`. These were written for specifi
 - `migrate-gmail-labels.mjs`: moves threads off the pre-rename labels (`App/Screener-*`, `App/Paper-Trail`) onto the current ones (`App/Gatekeeper-*`, `App/Receipts`), then deletes the old labels. Only needed if you ran an older build. Safe to re-run.
 - `backfill-pending-thread-ids.ts`: finds one held thread per pending sender for rows created before thread-linking existed in the Gatekeeper UI.
 - `diagnose-inbox.ts [sampleSize]`: read-only diagnostic. Samples the top N Gmail INBOX threads and tallies how each sender would resolve (pending / approved-yobox / other bucket / blocked / not in DB) without changing any labels. Useful for "why is Yobox empty" questions.
+- `diag-boxes.ts`: read-only diagnostic. Runs the same queries as `GET /api/boxes` and prints each box's unread count plus timing — for "why does the badge show N" questions.
+- `diag-load.ts`: read-only diagnostic. Times a full thread-list page load (cache hit vs live fetch) exactly as the route runs it.
+- `repair-sender-filing.mjs [--apply]`: batch re-files ALL of a sender's threads into the bucket their `sender_approvals` row says, for senders found mis-filed by an audit. Dry-run by default; writes a plan to `/tmp/repair-results.txt`. Without `--apply` it only prints what it would do.
 
 ## Development
 
